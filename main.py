@@ -1,18 +1,6 @@
 import socket
-import datetime
-import tkinter
-from tkinter import ttk
-from tkinter import messagebox
-import string
-import random
-import threading
 import time
-from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
-from wisepaasdatahubedgesdk.EdgeAgent import EdgeAgent
-import wisepaasdatahubedgesdk.Common.Constants as constant
-from wisepaasdatahubedgesdk.Model.Edge import EdgeAgentOptions, MQTTOptions, DCCSOptions, EdgeData, EdgeTag, EdgeStatus, EdgeDeviceStatus, EdgeConfig, NodeConfig, DeviceConfig, AnalogTagConfig, DiscreteTagConfig, TextTagConfig
-from wisepaasdatahubedgesdk.Common.Utils import RepeatedTimer
 from pymongo import MongoClient
 uri = "mongodb+srv://trunghothegadfly:dtrung2003@cluster0.wm7pzmb.mongodb.net/?retryWrites=true&w=majority"
 # Create client
