@@ -99,8 +99,10 @@ def update_temperature(current_temp, target_temp, pid_number):
 
 # Create the main window
 root = tk.Tk()
-root.title("ESP 3D G-Code Sender")
-
+root.title("RoT 3-D Manager SoftwareTM")
+# Create a frame for the host and port input
+connection_frame = tk.Frame(root)
+connection_frame.pack(pady=10)
 def connect_to_host():
     host = host_entry.get()
     port = int(port_entry.get())
@@ -111,9 +113,7 @@ def connect_to_host():
     recv_thread = threading.Thread(target=recv_log_messages, daemon=True)
     recv_thread.start()
 
-# Create a frame for the host and port input
-connection_frame = tk.Frame(root)
-connection_frame.pack(pady=10)
+
 
 host_label = tk.Label(connection_frame, text="Host:")
 host_label.pack(side=tk.LEFT)
