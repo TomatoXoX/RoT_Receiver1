@@ -1,15 +1,7 @@
 import socket
 import time
-from pymongo.server_api import ServerApi
-from pymongo import MongoClient
-uri = "mongodb+srv://trunghothegadfly:dtrung2003@cluster0.wm7pzmb.mongodb.net/?retryWrites=true&w=majority"
-# Create client
-client = MongoClient(uri,server_api=ServerApi('1'))
-db = client["RoT"]
-collection = db["3D_Printer_Status"]
-collection2 = db["3D_Printer_Data"]
-# Connect to the ESP3D Telnet server
-HOST = '192.168.1.4'
+
+HOST = '192.168.1.10'
 PORT = 8888
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((HOST, PORT))
@@ -51,8 +43,5 @@ def send_command(command):
     else:
         return "Busy"
 
-while 1>0:
-    collection.insert_one({"temperature":check_temp()})
-    collection2.insert_one({"Status": send_command("M27\n")})
 # Close the connection
 s.close()
