@@ -99,7 +99,7 @@ def update_temperature(current_temp, target_temp, pid_number):
 
 # Create the main window
 root = tk.Tk()
-root.title("ESP 3D G-Code Sender")
+root.title("RoT 3-D Manager SoftwareTM")
 
 def connect_to_host():
     host = host_entry.get()
