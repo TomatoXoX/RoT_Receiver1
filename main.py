@@ -2,11 +2,12 @@ import socket
 import time
 import tkinter as tk
 from tkinter import scrolledtext, ttk
+import threading
 
 HOST = '192.168.1.10'
 PORT = 8888
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((HOST, PORT))
+
 
 def process_log(log_data):
     log_display.insert(tk.END, log_data + '\n')
@@ -19,6 +20,17 @@ def process_log(log_data):
             update_progress_bar(current_byte, total_byte)
         except Exception as e:
             print("Error parsing progress:", e)
+
+    if "ok T:" in log_data:
+        try:
+            temp_data = log_data.split("ok T:")[1].strip()
+            current_temp, target_temp, pid_number = temp_data.split(" ", 2)
+            current_temp = float(current_temp)
+            target_temp = float(target_temp.split('/')[1])
+            pid_number = int(pid_number.split('@:')[1])
+            update_temperature(current_temp, target_temp, pid_number)
+        except Exception as e:
+            print("Error parsing temperature:", e)
 
 def recv_log_messages():
     buffer = ""
@@ -37,30 +49,86 @@ def send_command():
     s.send(cmd.encode('utf-8'))
     command_entry.delete(0, tk.END)
 
-def periodic_send():
-    global periodic_sending
-    if periodic_sending:
-        command = periodic_command_entry.get()
-        cmd = command + "\n"
-        s.send(cmd.encode('utf-8'))
-        root.after(int(interval_entry.get()) * 1000, periodic_send)
+class PeriodicSend:
+    def __init__(self, master):
+        self.master = master
+        self.frame = tk.Frame(self.master)
+        self.frame.pack()
 
-def toggle_periodic_send():
-    global periodic_sending
-    periodic_sending = not periodic_sending
-    if periodic_sending:
-        toggle_button.config(text="Stop Periodic Send")
-        root.after(int(interval_entry.get()) * 1000, periodic_send)
-    else:
-        toggle_button.config(text="Start Periodic Send")
+        self.periodic_command_entry = tk.Entry(self.frame, width=30)
+        self.periodic_command_entry.pack(side=tk.LEFT)
+
+        self.interval_entry = tk.Entry(self.frame, width=5)
+        self.interval_entry.pack(side=tk.LEFT)
+        self.interval_entry.insert(0, "5")
+
+        self.periodic_sending = False
+        self.toggle_button = tk.Button(self.frame, text="Start Periodic Send", command=self.toggle_periodic_send)
+        self.toggle_button.pack(side=tk.LEFT)
+
+    def periodic_send(self):
+        if self.periodic_sending:
+            commands = self.periodic_command_entry.get().split(';')
+            for command in commands:
+                cmd = command.strip() + "\n"
+                s.send(cmd.encode('utf-8'))
+            self.master.after(int(self.interval_entry.get()) * 1000, self.periodic_send)
+
+    def toggle_periodic_send(self):
+        self.periodic_sending = not self.periodic_sending
+        if self.periodic_sending:
+            self.toggle_button.config(text="Stop Periodic Send")
+            self.master.after(int(self.interval_entry.get()) * 1000, self.periodic_send)
+        else:
+            self.toggle_button.config(text="Start Periodic Send")
+
+def add_periodic_send():
+    periodic_sends.append(PeriodicSend(root))
+
 
 def update_progress_bar(current_byte, total_byte):
     progress = (current_byte / total_byte) * 100
     progress_var.set(progress)
+    progress_label.config(text=f"Progress: {progress:.2f}%")
+
+    if progress >= 100:
+        update_product_counter()
+
+def update_temperature(current_temp, target_temp, pid_number):
+    temp_var.set(f"Current Temp: {current_temp:.2f}°C\nTarget Temp: {target_temp:.2f}°C\nPID: {pid_number}")
 
 # Create the main window
 root = tk.Tk()
 root.title("ESP 3D G-Code Sender")
+
+def connect_to_host():
+    host = host_entry.get()
+    port = int(port_entry.get())
+    s.connect((host, port))
+
+    connect_button.config(text="Connected", state=tk.DISABLED)
+
+    recv_thread = threading.Thread(target=recv_log_messages, daemon=True)
+    recv_thread.start()
+
+# Create a frame for the host and port input
+connection_frame = tk.Frame(root)
+connection_frame.pack(pady=10)
+
+host_label = tk.Label(connection_frame, text="Host:")
+host_label.pack(side=tk.LEFT)
+host_entry = tk.Entry(connection_frame, width=15)
+host_entry.insert(0, HOST)
+host_entry.pack(side=tk.LEFT)
+
+port_label = tk.Label(connection_frame, text="Port:")
+port_label.pack(side=tk.LEFT)
+port_entry = tk.Entry(connection_frame, width=5)
+port_entry.insert(0, PORT)
+port_entry.pack(side=tk.LEFT)
+
+connect_button = tk.Button(connection_frame, text="Connect", command=connect_to_host)
+connect_button.pack(side=tk.LEFT)
 
 # Create a frame for the input field and buttons
 input_frame = tk.Frame(root)
@@ -74,41 +142,35 @@ command_entry.pack(side=tk.LEFT)
 send_button = tk.Button(input_frame, text="Send", command=send_command)
 send_button.pack(side=tk.LEFT)
 
-# Create a frame for the periodic sending input and button
-periodic_frame = tk.Frame(root)
-periodic_frame.pack()
-
-# Create the input field for periodic G-code commands
-periodic_command_entry = tk.Entry(periodic_frame, width=30)
-periodic_command_entry.pack(side=tk.LEFT)
-
-# Create the input field for the interval in seconds
-interval_entry = tk.Entry(periodic_frame, width=5)
-interval_entry.pack(side=tk.LEFT)
-interval_entry.insert(0, "5")
-
-# Create the button to toggle periodic sending
-periodic_sending = False
-toggle_button = tk.Button(periodic_frame, text="Start Periodic Send", command=toggle_periodic_send)
-toggle_button.pack(side=tk.LEFT)
+# Create the add periodic send button
+add_periodic_send_button = tk.Button(input_frame, text="+", command=add_periodic_send)
+add_periodic_send_button.pack(side=tk.LEFT)
 
 # Create a progress bar
 progress_var = tk.DoubleVar()
 progress_bar = ttk.Progressbar(root, orient="horizontal", length=200, mode="determinate", variable=progress_var)
 progress_bar.pack(pady=10)
 
-# Create a text widget for displaying log messages
-log_display = scrolledtext.ScrolledText(root, wrap=tk.WORD, width=60, height=20)
-log_display.pack()
+# Create a label to display progress percentage
+progress_label = tk.Label(root, text="Progress: 0.00%")
+progress_label.pack(pady=10)
 
-# Start receiving log messages in a separate thread
-import threading
+# Create a label to display temperature values
+temp_var = tk.StringVar()
+temp_var.set("Current Temp: -\nTarget Temp: -\nPID:-")
+temperature_label = tk.Label(root, textvariable=temp_var)
+temperature_label.pack(pady=10)
+
+# Create a scrolled text widget to display log messages
+log_display = scrolledtext.ScrolledText(root, wrap=tk.WORD, width=50, height=20)
+log_display.pack(pady=10)
+
+# Create a list to hold periodic send objects
+periodic_sends = []
+
+# Start the log message receiving loop in a separate thread
 recv_thread = threading.Thread(target=recv_log_messages, daemon=True)
 recv_thread.start()
 
-# Start the GUI event loop
+# Start the main loop
 root.mainloop()
-
-# Close the connection when the GUI is closed
-s.close()
-print("Connection closed.")
