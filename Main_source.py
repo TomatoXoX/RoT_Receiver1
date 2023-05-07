@@ -7,7 +7,7 @@ import threading
 HOST = '192.168.1.10'
 PORT = 8888
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((HOST, PORT))
+
 
 def process_log(log_data):
     log_display.insert(tk.END, log_data + '\n')
@@ -99,7 +99,36 @@ def update_temperature(current_temp, target_temp, pid_number):
 
 # Create the main window
 root = tk.Tk()
-root.title("ESP 3D G-Code Sender")
+root.title("RoT 3-D Manager SoftwareTM")
+# Create a frame for the host and port input
+connection_frame = tk.Frame(root)
+connection_frame.pack(pady=10)
+def connect_to_host():
+    host = host_entry.get()
+    port = int(port_entry.get())
+    s.connect((host, port))
+
+    connect_button.config(text="Connected", state=tk.DISABLED)
+
+    recv_thread = threading.Thread(target=recv_log_messages, daemon=True)
+    recv_thread.start()
+
+
+
+host_label = tk.Label(connection_frame, text="Host:")
+host_label.pack(side=tk.LEFT)
+host_entry = tk.Entry(connection_frame, width=15)
+host_entry.insert(0, HOST)
+host_entry.pack(side=tk.LEFT)
+
+port_label = tk.Label(connection_frame, text="Port:")
+port_label.pack(side=tk.LEFT)
+port_entry = tk.Entry(connection_frame, width=5)
+port_entry.insert(0, PORT)
+port_entry.pack(side=tk.LEFT)
+
+connect_button = tk.Button(connection_frame, text="Connect", command=connect_to_host)
+connect_button.pack(side=tk.LEFT)
 
 # Create a frame for the input field and buttons
 input_frame = tk.Frame(root)
