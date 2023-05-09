@@ -122,9 +122,6 @@ def update_progress_bar(current_byte, total_byte):
     progress_var.set(progress)
     progress_label.config(text=f"Progress: {progress:.2f}%")
 
-    if progress >= 100:
-        update_product_counter()
-
 def update_temperature(current_temp, target_temp, pid_number):
     temp_var.set(f"Current Temp: {current_temp:.2f}°C\nTarget Temp: {target_temp:.2f}°C\nPID: {pid_number}")
 
