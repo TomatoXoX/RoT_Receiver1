@@ -173,7 +173,40 @@ def categorization(temperature, progress):
     edgeData.tagList.append(tag_Temp)
     edgeData.timestamp = datetime.datetime.now()
     return edgeData
+def generateConfig():
+    config = EdgeConfig()
+    nodeConfig = NodeConfig(nodeType=constant.EdgeType['Gateway'])
+    config.node = nodeConfig
+    deviceConfig = DeviceConfig(id='3D Printer',
+                                name='3D Printer',
+                                description='Device',
+                                deviceType='Smart Device',
+                                retentionPolicyName='')
+    analog1 = AnalogTagConfig(name='Temperature',
+                                             description='ATag ',
+                                             readOnly=False,
+                                             arraySize=0,
+                                             spanHigh=1000,
+                                             spanLow=0,
+                                             engineerUnit='',
+                                             integerDisplayFormat=4,
+                                             fractionDisplayFormat=2)
+    analog2 = AnalogTagConfig(name='Progression',
+                              description='ATag ',
+                              readOnly=False,
+                              arraySize=0,
+                              spanHigh=1000,
+                              spanLow=0,
+                              engineerUnit='',
+                              integerDisplayFormat=4,
+                              fractionDisplayFormat=2)
+    deviceConfig.analogTagList.append(analog1)
+    deviceConfig.analogTagList.append(analog2)
+    config.node.deviceList.append(deviceConfig)
+    return config
 
+def upload_config(config,agent):
+    agent.uploadConfig(action=constant.ActionType['Create'], edgeConfig=config)
 
 # Add StringVar variables
 node_id = tk.StringVar()
@@ -234,6 +267,9 @@ SDK_connection_button.pack(side=tk.RIGHT)
 
 send_SDK_button = tk.Button(input_frame, text="Send Data to DB", command=toggle_send_data)
 send_SDK_button.pack(side=tk.RIGHT)
+
+Create_config = tk.Button(input_frame, text="Configure JSON", command=lambda: upload_config(generateConfig(), edgeAgent))
+Create_config.pack(side=tk.RIGHT)
 
 # Create the add periodic send button
 add_periodic_send_button = tk.Button(input_frame, text="+", command=add_periodic_send)
