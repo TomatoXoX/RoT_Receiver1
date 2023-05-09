@@ -4,7 +4,7 @@ import time
 import tkinter as tk
 from tkinter import scrolledtext, ttk
 import threading
-
+from tkinter import messagebox
 from wisepaasdatahubedgesdk.EdgeAgent import EdgeAgent
 import wisepaasdatahubedgesdk.Common.Constants as constant
 from wisepaasdatahubedgesdk.Model.Edge import EdgeAgentOptions, MQTTOptions, DCCSOptions, EdgeData, EdgeTag, EdgeStatus, \
@@ -159,7 +159,7 @@ def send_data_SDK(agent,data1,data2):
     agent.sendData(data)
 def categorization(temperature, progress):
     edgeData = EdgeData()
-    Temp_Device = "3D Printer"
+    Temp_Device = "3D_Printer"
     tag_Temp_name = "Temperature"
     value_temp = temperature
     tag_Progress_name = "Progression"
@@ -174,8 +174,8 @@ def generateConfig():
     config = EdgeConfig()
     nodeConfig = NodeConfig(nodeType=constant.EdgeType['Gateway'])
     config.node = nodeConfig
-    deviceConfig = DeviceConfig(id='3D Printer',
-                                name='3D Printer',
+    deviceConfig = DeviceConfig(id='3D_Printer',
+                                name='3D_Printer',
                                 description='Device',
                                 deviceType='Smart Device',
                                 retentionPolicyName='')
@@ -202,9 +202,11 @@ def generateConfig():
     config.node.deviceList.append(deviceConfig)
     return config
 
-def upload_config(config,agent):
+def upload_config(config, agent):
+    if agent is None:
+        tk.messagebox.showerror("Error", "Please connect to the SDK database before configuring JSON")
+        return
     agent.uploadConfig(action=constant.ActionType['Create'], edgeConfig=config)
-
 # Add StringVar variables
 node_id = tk.StringVar()
 api_url = tk.StringVar()
