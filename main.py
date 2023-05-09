@@ -11,6 +11,8 @@ from wisepaasdatahubedgesdk.Model.Edge import EdgeAgentOptions, MQTTOptions, DCC
     EdgeDeviceStatus, EdgeConfig, NodeConfig, DeviceConfig, AnalogTagConfig, DiscreteTagConfig, TextTagConfig
 from wisepaasdatahubedgesdk.Common.Utils import RepeatedTimer
 
+sending_data = False
+edgeAgent = None
 HOST = '192.168.1.10'
 PORT = 8888
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -23,7 +25,19 @@ def get_temp_value(value):
 def get_pro_value(value1,value2):
     global ans
     ans = (value1/value2)*100
+def toggle_send_data():
+    global sending_data
+    sending_data = not sending_data
+    if sending_data:
+        send_SDK_button.config(text="Stop Sending Data")
+        send_data_loop()
+    else:
+        send_SDK_button.config(text="Send Data to DB")
 
+def send_data_loop():
+    if sending_data:
+        send_data_SDK(edgeAgent, value_for_temp, ans)
+        root.after(1000, send_data_loop)  # Adjust the time interval as needed
 def process_log(log_data):
     log_display.insert(tk.END, log_data + '\n')
     log_display.see(tk.END)
@@ -142,7 +156,7 @@ def SDK_connect(api_link, NodeID, cred_key):
     # Update the SDK connection button's text
     SDK_connection_button.config(text='Connected to SDK Database', state=tk.DISABLED)
 
-edgeAgent = None
+
 def send_data_SDK(agent,data1,data2):
     data = categorization(data1,data2)
     agent.sendData(data)
@@ -218,7 +232,7 @@ SDK_connection_button = tk.Button(input_frame, text="Connect SDK database",
 SDK_connection_button.pack(side=tk.RIGHT)
 
 
-send_SDK_button = tk.Button(input_frame, text="Send Data to DB", command=lambda: send_data_SDK(edgeAgent, value_for_temp, ans))
+send_SDK_button = tk.Button(input_frame, text="Send Data to DB", command=toggle_send_data)
 send_SDK_button.pack(side=tk.RIGHT)
 
 # Create the add periodic send button
