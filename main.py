@@ -1,13 +1,28 @@
+import datetime
 import socket
 import time
 import tkinter as tk
 from tkinter import scrolledtext, ttk
 import threading
 
+from wisepaasdatahubedgesdk.EdgeAgent import EdgeAgent
+import wisepaasdatahubedgesdk.Common.Constants as constant
+from wisepaasdatahubedgesdk.Model.Edge import EdgeAgentOptions, MQTTOptions, DCCSOptions, EdgeData, EdgeTag, EdgeStatus, \
+    EdgeDeviceStatus, EdgeConfig, NodeConfig, DeviceConfig, AnalogTagConfig, DiscreteTagConfig, TextTagConfig
+from wisepaasdatahubedgesdk.Common.Utils import RepeatedTimer
+
 HOST = '192.168.1.10'
 PORT = 8888
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+value_for_temp = 0
+ans = 0
+def get_temp_value(value):
+    global value_for_temp
+    value_for_temp = value
 
+def get_pro_value(value1,value2):
+    global ans
+    ans = (value1/value2)*100
 
 def process_log(log_data):
     log_display.insert(tk.END, log_data + '\n')
@@ -18,6 +33,7 @@ def process_log(log_data):
             progress_data = log_data.split("SD printing byte")[1].strip()
             current_byte, total_byte = map(int, progress_data.split('/'))
             update_progress_bar(current_byte, total_byte)
+            get_pro_value(current_byte,total_byte)
         except Exception as e:
             print("Error parsing progress:", e)
 
@@ -29,6 +45,7 @@ def process_log(log_data):
             target_temp = float(target_temp.split('/')[1])
             pid_number = int(pid_number.split('@:')[1])
             update_temperature(current_temp, target_temp, pid_number)
+            get_temp_value(current_temp)
         except Exception as e:
             print("Error parsing temperature:", e)
 
@@ -113,7 +130,55 @@ def connect_to_host():
     recv_thread = threading.Thread(target=recv_log_messages, daemon=True)
     recv_thread.start()
 
+def SDK_connect(api_link,NodeID,cred_key):
 
+    edgeAgentOption = EdgeAgentOptions(nodeId=NodeID)
+    edgeAgentOption.connectType = constant.ConnectType['DCCS']
+    DCCS_Config = DCCSOptions(apiUrl=api_link, credentialKey=cred_key)
+    edgeAgentOption.DCCS = DCCS_Config
+    edgeAgent = EdgeAgent(edgeAgentOption)
+    edgeAgent.connect()
+
+edgeAgent = None
+def send_data_SDK(agent,data1,data2):
+    data = categorization(data1,data2)
+    agent.sendData(data)
+def categorization(temperature, progress):
+    edgeData = EdgeData()
+    Temp_Device = "3D Printer"
+    tag_Temp_name = "Temperature"
+    value_temp = temperature
+    tag_Progress_name = "Progression"
+    value_progress = progress
+    tag_Temp = EdgeTag(Temp_Device, tag_Temp_name, value_temp)
+    tag_Progress = EdgeTag(Temp_Device, tag_Progress_name, value_progress)
+    edgeData.tagList.append(tag_Progress)
+    edgeData.tagList.append(tag_Temp)
+    edgeData.timestamp = datetime.datetime.now()
+    return edgeData
+
+
+# Add StringVar variables
+node_id = tk.StringVar()
+api_url = tk.StringVar()
+credential_key = tk.StringVar()
+
+api_frame = tk.Frame(root)
+api_frame.pack(pady=10)
+
+api_label1 = tk.Label(api_frame, text="NodeID:")
+api_label1.grid(row=0, column=0, sticky="e", padx=10, pady=10)
+api_label2 = tk.Label(api_frame, text="API URL:")
+api_label2.grid(row=1, column=0, sticky="e", padx=10, pady=10)
+api_label3 = tk.Label(api_frame, text="Credential Key:")
+api_label3.grid(row=2, column=0, sticky="e", padx=10, pady=10)
+
+api_entry1 = tk.Entry(api_frame, textvariable=node_id)
+api_entry1.grid(row=0, column=1, padx=10, pady=10)
+api_entry2 = tk.Entry(api_frame, textvariable=api_url)
+api_entry2.grid(row=1, column=1, padx=10, pady=10)
+api_entry3 = tk.Entry(api_frame, textvariable=credential_key)
+api_entry3.grid(row=2, column=1, padx=10, pady=10)
 
 host_label = tk.Label(connection_frame, text="Host:")
 host_label.pack(side=tk.LEFT)
@@ -134,6 +199,9 @@ connect_button.pack(side=tk.LEFT)
 input_frame = tk.Frame(root)
 input_frame.pack()
 
+
+
+
 # Create the input field for G-code commands
 command_entry = tk.Entry(input_frame, width=30)
 command_entry.pack(side=tk.LEFT)
@@ -141,6 +209,13 @@ command_entry.pack(side=tk.LEFT)
 # Create the send button
 send_button = tk.Button(input_frame, text="Send", command=send_command)
 send_button.pack(side=tk.LEFT)
+
+SDK_connection_button = tk.Button(input_frame, text="Connect SDK database", command=lambda: SDK_connect(api_url.get(), node_id.get(), credential_key.get()))
+SDK_connection_button.pack(side=tk.RIGHT)
+
+
+send_SDK_button = tk.Button(input_frame, text="Send Data to DB", command=lambda: send_data_SDK(edgeAgent, value_for_temp, ans))
+send_SDK_button.pack(side=tk.RIGHT)
 
 # Create the add periodic send button
 add_periodic_send_button = tk.Button(input_frame, text="+", command=add_periodic_send)
