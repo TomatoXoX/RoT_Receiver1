@@ -130,14 +130,17 @@ def connect_to_host():
     recv_thread = threading.Thread(target=recv_log_messages, daemon=True)
     recv_thread.start()
 
-def SDK_connect(api_link,NodeID,cred_key):
-
+def SDK_connect(api_link, NodeID, cred_key):
+    global edgeAgent  # Added global keyword to modify the global variable
     edgeAgentOption = EdgeAgentOptions(nodeId=NodeID)
     edgeAgentOption.connectType = constant.ConnectType['DCCS']
     DCCS_Config = DCCSOptions(apiUrl=api_link, credentialKey=cred_key)
     edgeAgentOption.DCCS = DCCS_Config
     edgeAgent = EdgeAgent(edgeAgentOption)
     edgeAgent.connect()
+
+    # Update the SDK connection button's text
+    SDK_connection_button.config(text='Connected to SDK Database', state=tk.DISABLED)
 
 edgeAgent = None
 def send_data_SDK(agent,data1,data2):
@@ -210,7 +213,8 @@ command_entry.pack(side=tk.LEFT)
 send_button = tk.Button(input_frame, text="Send", command=send_command)
 send_button.pack(side=tk.LEFT)
 
-SDK_connection_button = tk.Button(input_frame, text="Connect SDK database", command=lambda: SDK_connect(api_url.get(), node_id.get(), credential_key.get()))
+SDK_connection_button = tk.Button(input_frame, text="Connect SDK database",
+                                  command=lambda: SDK_connect(api_url.get(), node_id.get(), credential_key.get()))
 SDK_connection_button.pack(side=tk.RIGHT)
 
 
