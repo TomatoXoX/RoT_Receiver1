@@ -10,7 +10,7 @@ import wisepaasdatahubedgesdk.Common.Constants as constant
 from wisepaasdatahubedgesdk.Model.Edge import EdgeAgentOptions, MQTTOptions, DCCSOptions, EdgeData, EdgeTag, EdgeStatus, \
     EdgeDeviceStatus, EdgeConfig, NodeConfig, DeviceConfig, AnalogTagConfig, DiscreteTagConfig, TextTagConfig
 from wisepaasdatahubedgesdk.Common.Utils import RepeatedTimer
-
+timer_value = "None"
 sending_data = False
 edgeAgent = None
 HOST = '192.168.1.10'
@@ -39,6 +39,7 @@ def send_data_loop():
         send_data_SDK(edgeAgent, value_for_temp, ans)
         root.after(1000, send_data_loop)  # Adjust the time interval as needed
 def process_log(log_data):
+    global timer_value
     log_display.insert(tk.END, log_data + '\n')
     log_display.see(tk.END)
 
@@ -62,6 +63,14 @@ def process_log(log_data):
             get_temp_value(current_temp)
         except Exception as e:
             print("Error parsing temperature:", e)
+    if "echo:Print time:" in log_data:
+        try:
+            print_time = log_data.split("echo:Print time:")[1].strip()
+            timer_value = print_time
+        except Exception as e:
+            print("Error parsing run time:",e)
+
+
 
 def recv_log_messages():
     buffer = ""
@@ -159,15 +168,26 @@ def send_data_SDK(agent,data1,data2):
     agent.sendData(data)
 def categorization(temperature, progress):
     edgeData = EdgeData()
+
     Temp_Device = "3D_Printer"
+
     tag_Temp_name = "Temperature"
     value_temp = temperature
+
     tag_Progress_name = "Progression"
     value_progress = progress
+
+    tag_Timer_name = "Print_Time"
+    value_timer = timer_value
+
     tag_Temp = EdgeTag(Temp_Device, tag_Temp_name, value_temp)
+    tag_Timer = EdgeTag(Temp_Device,tag_Timer_name, value_timer)
     tag_Progress = EdgeTag(Temp_Device, tag_Progress_name, value_progress)
+
+    edgeData.tagList.append(tag_Timer)
     edgeData.tagList.append(tag_Progress)
     edgeData.tagList.append(tag_Temp)
+
     edgeData.timestamp = datetime.datetime.now()
     return edgeData
 def generateConfig():
@@ -197,8 +217,19 @@ def generateConfig():
                               engineerUnit='',
                               integerDisplayFormat=4,
                               fractionDisplayFormat=2)
+    text = AnalogTagConfig(name='Print_Time',
+                              description='ATag ',
+                              readOnly=False,
+                              arraySize=0,
+                              spanHigh=1000,
+                              spanLow=0,
+                              engineerUnit='',
+                              integerDisplayFormat=4,
+                              fractionDisplayFormat=2)
+
     deviceConfig.analogTagList.append(analog1)
     deviceConfig.analogTagList.append(analog2)
+    deviceConfig.analogTagList.append(text)
     config.node.deviceList.append(deviceConfig)
     return config
 
