@@ -83,7 +83,7 @@ class DeviceGUI(tk.Frame):
         self.api_entry3 = tk.Entry(connection_settings, textvariable=self.credential_key)
         self.api_entry3.grid(row=2, column=1, padx=5, pady=5)
 
-        self.connect_button = tk.Button(connection_settings, text="Connect", command=self.connect)
+        self.connect_button = tk.Button(connection_settings, text="Connect Device", command=self.connect)
         self.connect_button.grid(row=3, column=0, padx=5, pady=5)
 
         self.connect_sdk_button = tk.Button(connection_settings, text="Connect SDK",
