@@ -12,11 +12,11 @@ from wisepaasdatahubedgesdk.Model.Edge import EdgeAgentOptions, MQTTOptions, DCC
 from wisepaasdatahubedgesdk.Common.Utils import RepeatedTimer
 # Import statements from the original code
 class PeriodicSend:
-    def __init__(self, master):
+    def __init__(self, master,device):
         self.master = master
         self.frame = tk.Frame(self.master)
         self.frame.pack()
-
+        self.device = device
         self.periodic_command_entry = tk.Entry(self.frame, width=30)
         self.periodic_command_entry.pack(side=tk.LEFT)
 
@@ -33,7 +33,7 @@ class PeriodicSend:
             commands = self.periodic_command_entry.get().split(';')
             for command in commands:
                 cmd = command.strip() + "\n"
-                s.send(cmd.encode('utf-8'))
+                self.device.send(cmd.encode('utf-8'))
             self.master.after(int(self.interval_entry.get()) * 1000, self.periodic_send)
 
     def toggle_periodic_send(self):
@@ -105,7 +105,7 @@ class DeviceGUI(tk.Frame):
         self.send_button = ttk.Button(command_section, text="Send", command=self.send_command)
         self.send_button.grid(row=0, column=1, padx=5, pady=5)
 
-        self.add_periodic_send_button = tk.Button(command_section, text="+", command=self.add_periodic_send)
+        self.add_periodic_send_button = tk.Button(command_section, text="+", command=self.add_periodic_send(self.s))
         self.add_periodic_send_button.grid(row=0, column=2, padx=5, pady=5)
 
         # Other Actions
@@ -294,10 +294,10 @@ class DeviceGUI(tk.Frame):
         self.edgeAgent = EdgeAgent(edgeAgentOption)
         self.edgeAgent.connect()
 
-    def add_periodic_send(self):
+    def add_periodic_send(self,device):
         periodic_send_frame = tk.Frame(self)
         periodic_send_frame.grid(row=len(self.periodic_sends) + 6, column=0, columnspan=2, padx=5, pady=5, sticky="we")
-        periodic_send = PeriodicSend(periodic_send_frame)
+        periodic_send = PeriodicSend(periodic_send_frame,device)
         self.periodic_sends.append(periodic_send)
 
     # Add the rest of the methods here, as instance methods of the DeviceGUI class
