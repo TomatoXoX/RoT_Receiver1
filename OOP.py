@@ -57,6 +57,7 @@ class DeviceGUI(tk.Frame):
         self.value_for_temp = 0
         self.ans = 0
         self.init_gui()
+        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def init_gui(self):
         self.periodic_sends = []
@@ -122,7 +123,7 @@ class DeviceGUI(tk.Frame):
         self.pack(expand=True, fill=tk.BOTH)
     def connect(self):
         try:
-            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
             self.s.connect((self.host, self.port))
             threading.Thread(target=self.recv_log_messages, daemon=True).start()
             self.connect_button.config(text="Connected", state=tk.DISABLED)
