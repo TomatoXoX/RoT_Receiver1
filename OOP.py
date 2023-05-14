@@ -54,6 +54,7 @@ class DeviceGUI(tk.Frame):
         self.timer_value = "None"
         self.sending_data = False
         self.edgeAgent = None
+        self.temp_var = "None"
         self.value_for_temp = 0
         self.ans = 0
         self.init_gui()
@@ -161,18 +162,17 @@ class DeviceGUI(tk.Frame):
 
         if "ok T:" in log_data:
             try:
-                self.temp_data = log_data.split("ok T:")[1].strip()
-                self.current_temp, target_temp, pid_number = temp_data.split(" ", 2)
-                self.current_temp = float(current_temp)
-                self.target_temp = float(target_temp.split('/')[1])
-                self.pid_number = int(pid_number.split('@:')[1])
-                self.update_temperature(current_temp, target_temp, pid_number)
+                temp_data = log_data.split("ok T:")[1].strip()
+                current_temp, target_temp, pid_number = temp_data.split(" ", 2)
+                current_temp = float(current_temp)
+                target_temp = float(target_temp.split('/')[1])
+                pid_number = int(pid_number.split('@:')[1])
                 self.get_temp_value(current_temp)
             except Exception as e:
                 print("Error parsing temperature:", e)
         if "echo:Print time:" in log_data:
             try:
-                self.print_time = log_data.split("echo:Print time:")[1].strip()
+                print_time = log_data.split("echo:Print time:")[1].strip()
                 self.timer_value = print_time
             except Exception as e:
                 print("Error parsing run time:", e)
@@ -203,7 +203,7 @@ class DeviceGUI(tk.Frame):
         self.s.send(cmd.encode('utf-8'))
         self.command_entry.delete(0, tk.END)
     def send_data_SDK(self, edge_agent, temperature, progress):
-        self.data = self.categorization(self.temperature, self.progress)
+        self.data = self.categorization(temperature, progress)
         edge_agent.sendData(self.data)
         pass
     def generateConfig(self):
@@ -283,10 +283,7 @@ class DeviceGUI(tk.Frame):
         self.progress_var.set(progress)
         self.progress_label.config(text=f"Progress: {progress:.2f}%")
         pass
-    def update_temperature(self, current_temp,target_temp,pid_number):
-        # Implement the method to update the temperature display
-        self.temp_var.set(f"Current Temp: {current_temp:.2f}°C\nTarget Temp: {target_temp:.2f}°C\nPID: {pid_number}")
-        pass
+
     def SDK_connect(self,api_link, NodeID, cred_key):
         self.edgeAgentOption = EdgeAgentOptions(nodeId=NodeID)
         self.edgeAgentOption.connectType = constant.ConnectType['DCCS']
