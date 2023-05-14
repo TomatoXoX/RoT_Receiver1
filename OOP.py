@@ -106,7 +106,7 @@ class DeviceGUI(tk.Frame):
         self.send_button = ttk.Button(command_section, text="Send", command=self.send_command)
         self.send_button.grid(row=0, column=1, padx=5, pady=5)
 
-        self.add_periodic_send_button = tk.Button(command_section, text="+", command=self.add_periodic_send(self.s))
+        self.add_periodic_send_button = tk.Button(command_section, text="+", command=self.add_periodic_send)
         self.add_periodic_send_button.grid(row=0, column=2, padx=5, pady=5)
 
         # Other Actions
@@ -145,7 +145,7 @@ class DeviceGUI(tk.Frame):
     def send_data_loop(self):
         if self.sending_data:
             self.send_data_SDK(self.edgeAgent, self.value_for_temp, self.ans)
-
+            print(f"temp={self.value_for_temp}")
             self.after(1000, self.send_data_loop)  # Adjust the time interval as needed
     def process_log(self, log_data):
         self.log_display.insert(tk.END, log_data + '\n')
@@ -203,7 +203,7 @@ class DeviceGUI(tk.Frame):
         self.s.send(cmd.encode('utf-8'))
         self.command_entry.delete(0, tk.END)
     def send_data_SDK(self, edge_agent, temperature, progress):
-        self.data = self.categorization(temperature, progress)
+        self.data = self.categorization(self.temperature, self.progress)
         edge_agent.sendData(self.data)
         pass
     def generateConfig(self):
@@ -292,13 +292,13 @@ class DeviceGUI(tk.Frame):
         self.edgeAgentOption.connectType = constant.ConnectType['DCCS']
         self.DCCS_Config = DCCSOptions(apiUrl=api_link, credentialKey=cred_key)
         self.edgeAgentOption.DCCS = self.DCCS_Config
-        self.edgeAgent = EdgeAgent(edgeAgentOption)
+        self.edgeAgent = EdgeAgent(self.edgeAgentOption)
         self.edgeAgent.connect()
 
-    def add_periodic_send(self,device):
+    def add_periodic_send(self):
         periodic_send_frame = tk.Frame(self)
         periodic_send_frame.grid(row=len(self.periodic_sends) + 6, column=0, columnspan=2, padx=5, pady=5, sticky="we")
-        periodic_send = PeriodicSend(periodic_send_frame,device)
+        periodic_send = PeriodicSend(periodic_send_frame,self.s)
         self.periodic_sends.append(periodic_send)
 
     # Add the rest of the methods here, as instance methods of the DeviceGUI class
