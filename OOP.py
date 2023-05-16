@@ -1,4 +1,10 @@
 import datetime
+import requests
+import cv2
+import numpy as np
+from roboflow import Roboflow
+from PIL import Image
+from io import BytesIO
 import socket
 import time
 import tkinter as tk
@@ -59,12 +65,21 @@ class DeviceGUI(tk.Frame):
         self.ans = 0
         self.init_gui()
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
+        # AI    
+        self.AI_link = "None"
+        self.model  = 0
+        self.img_np = 0
+        
+         
     def init_gui(self):
         self.periodic_sends = []
         self.node_id = tk.StringVar()
         self.api_url = tk.StringVar()
         self.credential_key = tk.StringVar()
+
+        self.ESPCAM = tk.StringVar()
+        cv2.namedWindow("Processed Image", cv2.WINDOW_NORMAL)
+
         self.printing_progress = tk.DoubleVar()
         self.temp_display = tk.StringVar()
         self.temp_display.set("Current Temp: -\nTarget Temp: -\nPID:-")
@@ -112,7 +127,20 @@ class DeviceGUI(tk.Frame):
                                             command=lambda: self.SDK_connect(self.api_url.get(), self.node_id.get(),
                                                                              self.credential_key.get()))
         self.connect_sdk_button.grid(row=3, column=1, padx=5, pady=5)
-
+#  _____ ____  ____      _________     ____    _    __  __   _
+ #| ____/ ___||  _ \    |___ /___ \   / ___|  / \  |  \/  | | |__   _____  __
+ #|  _| \___ \| |_) |____ |_ \ __) | | |     / _ \ | |\/| | | '_ \ / _ \ \/ /
+ #| |___ ___) |  __/_____|__) / __/  | |___ / ___ \| |  | | | |_) | (_) >  <
+ #|_____|____/|_|       |____/_____|  \____/_/   \_\_|  |_| |_.__/ \___/_/\_\
+        self.ESPCam_label = tk.Entry(connection_settings,textvariable=self.ESPCAM)
+        self.ESPCam_label.grid(row=3, column=2, padx=5, pady=5, sticky="e")
+        self.ESPCam_Btn = tk.Button(connection_settings,text="Connect to ESP-CAM",command = self.buttonCallback)
+        self.ESPCam_Btn.grid(row =3, column = 5,padx=5, pady=5, sticky="e")
+        
+        
+        
+        
+        
         # Log Display
         self.log_display = scrolledtext.ScrolledText(self, wrap=tk.WORD, width=50, height=20)
         self.log_display.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
@@ -142,6 +170,91 @@ class DeviceGUI(tk.Frame):
         self.send_SDK_button.grid(row=1, column=0, padx=5, pady=5)
 
         self.pack(expand=True, fill=tk.BOTH)
+        
+        
+        
+        
+    def buttonCallback(self):
+        try:
+            rf = Roboflow(api_key="Sb6J3slpbLnQuWDH67DW")
+            project = rf.workspace().project("3d-printing-flaws")
+            self.model = project.version(8).model
+            
+            # Global variable to store the processed image
+            self.processed_image = None
+
+            #
+            threading.Thread(target=self.getImage,daemon=True).start()
+            
+            
+            
+                 # TBD
+        except Exception as e:
+            print(e)         
+    # Get images from ESP-32CAM
+    def getImage(self):
+        while True:
+           self.process_image("http://192.168.1.6/snap") # Change  this later
+            
+    # Process images from ESP-32CAM
+    def process_image(self, image_url):
+        # Retrieve the image from the url
+        response = requests.get(image_url)
+        if response.status_code == 200:         # 200 = Normal
+            image = Image.open(BytesIO(response.content))
+            self.img_np = np.array(image)
+
+            # Resize the image to a constant size (640x640)
+            self.img_np = cv2.resize(self.img_np, (1600, 1200))
+            predictions = self.model.predict(self.img_np, confidence=40, overlap=30).json()
+            print(predictions)
+            # Process the predictions and draw bounding boxes on the image
+            for prediction in predictions['predictions']:
+                cx = int(prediction['x'])
+                cy = int(prediction['y'])
+                w = int(prediction['width'])
+                h = int(prediction['height'])
+                class_label = prediction['class']
+                confidence = prediction['confidence']
+
+                # Calculate the coordinates of the top-left and bottom-right corners
+                x1 = cx - w // 2
+                y1 = cy - h // 2
+                x2 = cx + w // 2
+                y2 = cy + h // 2
+
+                # Draw the rectangle on the image
+                cv2.rectangle(self.img_np, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+                # Customize label appearance
+                label_text = f"{class_label}: {confidence:.2f}"
+                label_position = (x1, y1)
+                label_font = cv2.FONT_HERSHEY_SIMPLEX
+                label_font_scale = 0.5
+                label_color = (0, 0, 0)  # Black text color
+                label_background_color = (128, 0, 128)  # Purple background color
+                label_thickness = 2
+
+                # Determine the size of the label text
+                (label_width, label_height), _ = cv2.getTextSize(label_text, label_font, label_font_scale, label_thickness)
+
+                # Create a background rectangle for the label
+                background_top_left = (label_position[0], label_position[1] - label_height)
+                background_bottom_right = (label_position[0] + label_width, label_position[1])
+                cv2.rectangle(self.img_np, background_top_left, background_bottom_right, label_background_color, cv2.FILLED)
+
+                # Write label on the image
+                cv2.putText(self.img_np, label_text, label_position, label_font, label_font_scale, label_color, label_thickness)
+                
+                
+                
+                # Show the processed image in the window not working!!!!!!!!!!!!!!
+                cv2.imshow("Processed Image", self.img_np)
+                cv2.waitKey(1)  # Adjust the delay as needed
+            
+
+            
+
     def connect(self):
         try:
 
@@ -180,6 +293,7 @@ class DeviceGUI(tk.Frame):
                 current_byte, total_byte = map(int, progress_data.split('/'))
                 progress = self.get_pro_value(current_byte, total_byte)
                 self.update_progress_bar(progress)
+
                 self.printing_progress.set(progress)
             except Exception as e:
                 print("Error parsing progress:", e)
