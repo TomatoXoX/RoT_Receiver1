@@ -65,6 +65,9 @@ class DeviceGUI(tk.Frame):
         self.node_id = tk.StringVar()
         self.api_url = tk.StringVar()
         self.credential_key = tk.StringVar()
+        self.printing_progress = tk.DoubleVar()
+        self.temp_display = tk.StringVar()
+        self.temp_display.set("Current Temp: -\nTarget Temp: -\nPID:-")
 
         # Connection Settings
         connection_settings = tk.LabelFrame(self, text="Connection Settings")
@@ -122,6 +125,23 @@ class DeviceGUI(tk.Frame):
         self.send_SDK_button.grid(row=1, column=0, padx=5, pady=5)
 
         self.pack(expand=True, fill=tk.BOTH)
+        # Device Info
+
+        device_info = tk.LabelFrame(self, text="Device Info")
+        device_info.grid(row=0, column=2, padx=5, pady=5, sticky="we", rowspan=2)
+
+        self.temp_label = tk.Label(device_info, text="Temperature: ")
+        self.temp_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+
+        self.temp_value_label = tk.Label(device_info, textvariable=self.temp_display)
+        self.temp_value_label.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+        self.progress_label = tk.Label(device_info, text="Printing Progress: ")
+        self.progress_label.grid(row=1, column=0, padx=5, pady=5, sticky="w")
+
+        self.progress_bar = ttk.Progressbar(device_info, orient="horizontal", length=200, mode="determinate",
+                                            variable=self.printing_progress)
+        self.progress_bar.grid(row=1, column=1, padx=5, pady=5, sticky="w")
     def connect(self):
         try:
 
@@ -133,6 +153,10 @@ class DeviceGUI(tk.Frame):
     # Add the rest of the methods from your original code as instance methods of the DeviceGUI class
     def get_temp_value(self, value):
         self.value_for_temp = value
+
+    def update_temperature(self,current_temp, target_temp, pid_number):
+        self.temp_var.set(f"Current Temp: {current_temp:.2f}°C\nTarget Temp: {target_temp:.2f}°C\nPID: {pid_number}")
+
     def get_pro_value(self, value1, value2):
         self.ans = (value1 / value2) * 100
         return self.ans
@@ -146,7 +170,6 @@ class DeviceGUI(tk.Frame):
     def send_data_loop(self):
         if self.sending_data:
             self.send_data_SDK(self.edgeAgent, self.value_for_temp, self.ans)
-            print(f"temp={self.value_for_temp}")
             self.after(1000, self.send_data_loop)  # Adjust the time interval as needed
     def process_log(self, log_data):
         self.log_display.insert(tk.END, log_data + '\n')
@@ -156,7 +179,7 @@ class DeviceGUI(tk.Frame):
                 progress_data = log_data.split("SD printing byte")[1].strip()
                 current_byte, total_byte = map(int, progress_data.split('/'))
                 progress = self.get_pro_value(current_byte, total_byte)
-                self.update_progress_bar(progress)
+                self.printing_progress.set(progress)
             except Exception as e:
                 print("Error parsing progress:", e)
 
@@ -167,6 +190,7 @@ class DeviceGUI(tk.Frame):
                 current_temp = float(current_temp)
                 target_temp = float(target_temp.split('/')[1])
                 pid_number = int(pid_number.split('@:')[1])
+                self.update_temperature(current_temp,target_temp,pid_number)
                 self.get_temp_value(current_temp)
             except Exception as e:
                 print("Error parsing temperature:", e)
@@ -277,12 +301,6 @@ class DeviceGUI(tk.Frame):
 
         self.edgeData.timestamp = datetime.datetime.now()
         return self.edgeData
-    def update_progress_bar(self, progress):
-        # Implement the method to update the progress bar
-        progress = (current_byte / total_byte) * 100
-        self.progress_var.set(progress)
-        self.progress_label.config(text=f"Progress: {progress:.2f}%")
-        pass
 
     def SDK_connect(self,api_link, NodeID, cred_key):
         self.edgeAgentOption = EdgeAgentOptions(nodeId=NodeID)
