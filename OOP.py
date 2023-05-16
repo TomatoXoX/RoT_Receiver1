@@ -76,26 +76,49 @@ class DeviceGUI(tk.Frame):
         self.node_id = tk.StringVar()
         self.api_url = tk.StringVar()
         self.credential_key = tk.StringVar()
+
         self.ESPCAM = tk.StringVar()
         cv2.namedWindow("Processed Image", cv2.WINDOW_NORMAL)
+
+        self.printing_progress = tk.DoubleVar()
+        self.temp_display = tk.StringVar()
+        self.temp_display.set("Current Temp: -\nTarget Temp: -\nPID:-")
+
+        # Device Info
+        device_info = tk.LabelFrame(self, text="Device Information")
+        device_info.grid(row=0, column=0, padx=5, pady=5, sticky="we", columnspan=2)
+
+        self.temp_label = tk.Label(device_info, text="Temperature:")
+        self.temp_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+
+        self.temp_value_label = tk.Label(device_info, textvariable=self.temp_display)
+        self.temp_value_label.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+        self.progress_label = tk.Label(device_info, text="Printing Progress:")
+        self.progress_label.grid(row=1, column=0, padx=5, pady=5, sticky="w")
+
+        self.progress_bar = ttk.Progressbar(device_info, orient="horizontal", length=200, mode="determinate",
+                                            variable=self.printing_progress)
+        self.progress_bar.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
         # Connection Settings
         connection_settings = tk.LabelFrame(self, text="Connection Settings")
-        connection_settings.grid(row=0, column=0, padx=5, pady=5, sticky="we", columnspan=2)
+        connection_settings.grid(row=1, column=0, padx=5, pady=5, sticky="we", columnspan=2)
 
         self.api_label1 = tk.Label(connection_settings, text="NodeID:")
         self.api_label1.grid(row=0, column=0, padx=5, pady=5, sticky="e")
         self.api_entry1 = tk.Entry(connection_settings, textvariable=self.node_id)
-        self.api_entry1.grid(row=0, column=1, padx=5, pady=5)
+        self.api_entry1.grid(row=0, column=1, padx=5, pady=5, sticky="w")
 
         self.api_label2 = tk.Label(connection_settings, text="API URL:")
         self.api_label2.grid(row=1, column=0, padx=5, pady=5, sticky="e")
         self.api_entry2 = tk.Entry(connection_settings, textvariable=self.api_url)
-        self.api_entry2.grid(row=1, column=1, padx=5, pady=5)
+        self.api_entry2.grid(row=1, column=1, padx=5, pady=5, sticky="w")
 
         self.api_label3 = tk.Label(connection_settings, text="Credential Key:")
         self.api_label3.grid(row=2, column=0, padx=5, pady=5, sticky="e")
         self.api_entry3 = tk.Entry(connection_settings, textvariable=self.credential_key)
-        self.api_entry3.grid(row=2, column=1, padx=5, pady=5)
+        self.api_entry3.grid(row=2, column=1, padx=5, pady=5, sticky="w")
 
         self.connect_button = tk.Button(connection_settings, text="Connect Device", command=self.connect)
         self.connect_button.grid(row=3, column=0, padx=5, pady=5)
@@ -120,11 +143,11 @@ class DeviceGUI(tk.Frame):
         
         # Log Display
         self.log_display = scrolledtext.ScrolledText(self, wrap=tk.WORD, width=50, height=20)
-        self.log_display.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
+        self.log_display.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
 
         # Command and Periodic Send
-        command_section = tk.LabelFrame(self, text="Command and Periodic Send")
-        command_section.grid(row=2, column=0, padx=5, pady=5, sticky="we", columnspan=2)
+        command_section = tk.LabelFrame(self, text="Commands and Periodic Sends")
+        command_section.grid(row=3, column=0, padx=5, pady=5, sticky="we", columnspan=2)
 
         self.command_entry = ttk.Entry(command_section)
         self.command_entry.grid(row=0, column=0, padx=5, pady=5, sticky="we")
@@ -136,14 +159,14 @@ class DeviceGUI(tk.Frame):
         self.add_periodic_send_button.grid(row=0, column=2, padx=5, pady=5)
 
         # Other Actions
-        other_actions = tk.LabelFrame(self, text="Other Actions")
-        other_actions.grid(row=0, column=2, padx=5, pady=5, sticky="we", rowspan=2)
+        other_actions = tk.LabelFrame(self, text="Additional Actions")
+        other_actions.grid(row=4, column=0, padx=5, pady=5, sticky="we", columnspan=2)
 
         self.create_config = tk.Button(other_actions, text="Configure JSON",
                                        command=lambda: self.upload_config(self.generateConfig(), self.edgeAgent))
         self.create_config.grid(row=0, column=0, padx=5, pady=5)
 
-        self.send_SDK_button = ttk.Button(other_actions, text="Send Data to DB", command=self.toggle_send_data)
+        self.send_SDK_button = ttk.Button(other_actions, text="Send Data to Database", command=self.toggle_send_data)
         self.send_SDK_button.grid(row=1, column=0, padx=5, pady=5)
 
         self.pack(expand=True, fill=tk.BOTH)
@@ -231,6 +254,7 @@ class DeviceGUI(tk.Frame):
             
 
             
+
     def connect(self):
         try:
 
@@ -252,6 +276,9 @@ class DeviceGUI(tk.Frame):
             self.send_data_loop()
         else:
             self.send_SDK_button.config(text="Send Data to DB")
+    def update_temperature(self,current_temp, target_temp, pid_number):
+        self.temp_display.set(f"Current Temp: {current_temp:.2f}°C\nTarget Temp: {target_temp:.2f}°C\nPID: {pid_number}")
+
     def send_data_loop(self):
         if self.sending_data:
             self.send_data_SDK(self.edgeAgent, self.value_for_temp, self.ans)
@@ -266,6 +293,8 @@ class DeviceGUI(tk.Frame):
                 current_byte, total_byte = map(int, progress_data.split('/'))
                 progress = self.get_pro_value(current_byte, total_byte)
                 self.update_progress_bar(progress)
+
+                self.printing_progress.set(progress)
             except Exception as e:
                 print("Error parsing progress:", e)
 
@@ -277,6 +306,7 @@ class DeviceGUI(tk.Frame):
                 target_temp = float(target_temp.split('/')[1])
                 pid_number = int(pid_number.split('@:')[1])
                 self.get_temp_value(current_temp)
+                self.update_temperature(current_temp,target_temp,pid_number)
             except Exception as e:
                 print("Error parsing temperature:", e)
         if "echo:Print time:" in log_data:
