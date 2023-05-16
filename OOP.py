@@ -81,6 +81,7 @@ class DeviceGUI(tk.Frame):
         cv2.namedWindow("Processed Image", cv2.WINDOW_NORMAL)
 
         self.printing_progress = tk.DoubleVar()
+        self.printing_progress.set(0)
         self.temp_display = tk.StringVar()
         self.temp_display.set("Current Temp: -\nTarget Temp: -\nPID:-")
 
