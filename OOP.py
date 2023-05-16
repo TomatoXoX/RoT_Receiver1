@@ -294,8 +294,7 @@ class DeviceGUI(tk.Frame):
                 current_byte, total_byte = map(int, progress_data.split('/'))
                 progress = self.get_pro_value(current_byte, total_byte)
                 self.update_progress_bar(progress)
-
-                self.printing_progress.set(progress)
+                self.printing_progress.set(self.ans)
             except Exception as e:
                 print("Error parsing progress:", e)
 
