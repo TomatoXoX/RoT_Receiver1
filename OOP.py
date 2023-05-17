@@ -3,7 +3,7 @@ import requests
 import cv2
 import numpy as np
 from roboflow import Roboflow
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont, ImageTk
 from io import BytesIO
 import socket
 import time
@@ -69,7 +69,14 @@ class DeviceGUI(tk.Frame):
         self.AI_link = "None"
         self.model  = 0
         self.img_np = 0
-        
+        # Image display
+            # Old code use for backup    
+            #self.image_label = tk.Label(self)
+            #self.image_label.grid(row=3, column=0, columnspan=2, padx=5, pady=5)
+        # Create a new window for image display
+        self.image_window = tk.Toplevel(self)
+        self.image_label = tk.Label(self.image_window)
+        self.image_label.pack()   
          
     def init_gui(self):
         self.periodic_sends = []
@@ -77,7 +84,6 @@ class DeviceGUI(tk.Frame):
         self.api_url = tk.StringVar()
         self.credential_key = tk.StringVar()
         self.ESPCAM = tk.StringVar()
-        cv2.namedWindow("Processed Image", cv2.WINDOW_NORMAL)
         # Connection Settings
         connection_settings = tk.LabelFrame(self, text="Connection Settings")
         connection_settings.grid(row=0, column=0, padx=5, pady=5, sticky="we", columnspan=2)
@@ -106,7 +112,7 @@ class DeviceGUI(tk.Frame):
         self.connect_sdk_button.grid(row=3, column=1, padx=5, pady=5)
 #  _____ ____  ____      _________     ____    _    __  __   _
  #| ____/ ___||  _ \    |___ /___ \   / ___|  / \  |  \/  | | |__   _____  __
- #|  _| \___ \| |_) |____ |_ \ __) | | |     / _ \ | |\/| | | '_ \ / _ \ \/ /
+ #|  _| \___ \| |_) |____ |_ \ __) | | |     / _ \ | |\/| | | '_ \ / _ \ \/ 6+/
  #| |___ ___) |  __/_____|__) / __/  | |___ / ___ \| |  | | | |_) | (_) >  <
  #|_____|____/|_|       |____/_____|  \____/_/   \_\_|  |_| |_.__/ \___/_/\_\
         self.ESPCam_label = tk.Entry(connection_settings,textvariable=self.ESPCAM)
@@ -156,36 +162,39 @@ class DeviceGUI(tk.Frame):
             rf = Roboflow(api_key="Sb6J3slpbLnQuWDH67DW")
             project = rf.workspace().project("3d-printing-flaws")
             self.model = project.version(8).model
-            
+            print(self.ESPCAM.get())
             # Global variable to store the processed image
-            self.processed_image = None
+            self.processed_image = None         # Usage = ?, delete soon
 
-            #
             threading.Thread(target=self.getImage,daemon=True).start()
             
-            
-            
-                 # TBD
         except Exception as e:
             print(e)         
     # Get images from ESP-32CAM
     def getImage(self):
         while True:
-           self.process_image("http://192.168.1.6/snap") # Change  this later
+           try: 
+            self.process_image(self.ESPCAM.get())
             
+           except Exception as e:
+               print(e) 
+           time.sleep(1)     
     # Process images from ESP-32CAM
     def process_image(self, image_url):
-        # Retrieve the image from the url
+        # Retrieve the image from the URL
         response = requests.get(image_url)
-        if response.status_code == 200:         # 200 = Normal
+        if response.status_code == 200:  # 200 = Normal
             image = Image.open(BytesIO(response.content))
             self.img_np = np.array(image)
 
-            # Resize the image to a constant size (640x640)
-            self.img_np = cv2.resize(self.img_np, (1600, 1200))
+            # Resize the image to a constant size (480x480)
+            image = image.resize((480, 480))
+
             predictions = self.model.predict(self.img_np, confidence=40, overlap=30).json()
             print(predictions)
+
             # Process the predictions and draw bounding boxes on the image
+            draw = ImageDraw.Draw(image)
             for prediction in predictions['predictions']:
                 cx = int(prediction['x'])
                 cy = int(prediction['y'])
@@ -201,35 +210,42 @@ class DeviceGUI(tk.Frame):
                 y2 = cy + h // 2
 
                 # Draw the rectangle on the image
-                cv2.rectangle(self.img_np, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                draw.rectangle([(x1, y1), (x2, y2)], outline=(0, 255, 0), width=2)
 
                 # Customize label appearance
                 label_text = f"{class_label}: {confidence:.2f}"
                 label_position = (x1, y1)
-                label_font = cv2.FONT_HERSHEY_SIMPLEX
-                label_font_scale = 0.5
+                label_font = ImageFont.load_default()
+                #label_font = ImageFont.truetype("path_to_font_file.ttf", size=12)  # Replace "path_to_font_file.ttf" with the actual font file path
                 label_color = (0, 0, 0)  # Black text color
                 label_background_color = (128, 0, 128)  # Purple background color
-                label_thickness = 2
 
                 # Determine the size of the label text
-                (label_width, label_height), _ = cv2.getTextSize(label_text, label_font, label_font_scale, label_thickness)
+                label_width, label_height = draw.textsize(label_text, font=label_font)
 
                 # Create a background rectangle for the label
                 background_top_left = (label_position[0], label_position[1] - label_height)
                 background_bottom_right = (label_position[0] + label_width, label_position[1])
-                cv2.rectangle(self.img_np, background_top_left, background_bottom_right, label_background_color, cv2.FILLED)
+                draw.rectangle([background_top_left, background_bottom_right], fill=label_background_color)
 
                 # Write label on the image
-                cv2.putText(self.img_np, label_text, label_position, label_font, label_font_scale, label_color, label_thickness)
-                
-                
-                
-                # Show the processed image in the window not working!!!!!!!!!!!!!!
-                cv2.imshow("Processed Image", self.img_np)
-                cv2.waitKey(1)  # Adjust the delay as needed
-            
+                draw.text(label_position, label_text, font=label_font, fill=label_color)
 
+            # Show the processed image
+            self.display_image(image)
+
+            
+    def display_image(self, image):
+        # Convert the image to PhotoImage format
+        photo = ImageTk.PhotoImage(image)
+
+        # Update the label with the new image
+        self.image_label.configure(image=photo)
+        self.image_label.image = photo
+
+        # Bring the image window to the front
+        self.image_window.lift()
+        self.image_window.attributes('-topmost', True)
             
     def connect(self):
         try:
