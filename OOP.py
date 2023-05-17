@@ -1,6 +1,5 @@
 import datetime
 import requests
-import cv2
 import numpy as np
 from roboflow import Roboflow
 from PIL import Image, ImageDraw, ImageFont, ImageTk
