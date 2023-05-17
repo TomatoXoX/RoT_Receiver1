@@ -1,15 +1,45 @@
+import datetime
 import socket
 import time
 import tkinter as tk
 from tkinter import scrolledtext, ttk
 import threading
-
+from tkinter import messagebox
+from wisepaasdatahubedgesdk.EdgeAgent import EdgeAgent
+import wisepaasdatahubedgesdk.Common.Constants as constant
+from wisepaasdatahubedgesdk.Model.Edge import EdgeAgentOptions, MQTTOptions, DCCSOptions, EdgeData, EdgeTag, EdgeStatus, \
+    EdgeDeviceStatus, EdgeConfig, NodeConfig, DeviceConfig, AnalogTagConfig, DiscreteTagConfig, TextTagConfig
+from wisepaasdatahubedgesdk.Common.Utils import RepeatedTimer
+timer_value = "None"
+sending_data = False
+edgeAgent = None
 HOST = '192.168.1.10'
 PORT = 8888
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+value_for_temp = 0
+ans = 0
+def get_temp_value(value):
+    global value_for_temp
+    value_for_temp = value
 
+def get_pro_value(value1,value2):
+    global ans
+    ans = (value1/value2)*100
+def toggle_send_data():
+    global sending_data
+    sending_data = not sending_data
+    if sending_data:
+        send_SDK_button.config(text="Stop Sending Data")
+        send_data_loop()
+    else:
+        send_SDK_button.config(text="Send Data to DB")
 
+def send_data_loop():
+    if sending_data:
+        send_data_SDK(edgeAgent, value_for_temp, ans)
+        root.after(1000, send_data_loop)  # Adjust the time interval as needed
 def process_log(log_data):
+    global timer_value
     log_display.insert(tk.END, log_data + '\n')
     log_display.see(tk.END)
 
@@ -18,6 +48,7 @@ def process_log(log_data):
             progress_data = log_data.split("SD printing byte")[1].strip()
             current_byte, total_byte = map(int, progress_data.split('/'))
             update_progress_bar(current_byte, total_byte)
+            get_pro_value(current_byte,total_byte)
         except Exception as e:
             print("Error parsing progress:", e)
 
@@ -29,8 +60,17 @@ def process_log(log_data):
             target_temp = float(target_temp.split('/')[1])
             pid_number = int(pid_number.split('@:')[1])
             update_temperature(current_temp, target_temp, pid_number)
+            get_temp_value(current_temp)
         except Exception as e:
             print("Error parsing temperature:", e)
+    if "echo:Print time:" in log_data:
+        try:
+            print_time = log_data.split("echo:Print time:")[1].strip()
+            timer_value = print_time
+        except Exception as e:
+            print("Error parsing run time:",e)
+
+
 
 def recv_log_messages():
     buffer = ""
@@ -91,9 +131,6 @@ def update_progress_bar(current_byte, total_byte):
     progress_var.set(progress)
     progress_label.config(text=f"Progress: {progress:.2f}%")
 
-    if progress >= 100:
-        update_product_counter()
-
 def update_temperature(current_temp, target_temp, pid_number):
     temp_var.set(f"Current Temp: {current_temp:.2f}°C\nTarget Temp: {target_temp:.2f}°C\nPID: {pid_number}")
 
@@ -113,7 +150,115 @@ def connect_to_host():
     recv_thread = threading.Thread(target=recv_log_messages, daemon=True)
     recv_thread.start()
 
+def SDK_connect(api_link, NodeID, cred_key):
+    global edgeAgent  # Added global keyword to modify the global variable
+    edgeAgentOption = EdgeAgentOptions(nodeId=NodeID)
+    edgeAgentOption.connectType = constant.ConnectType['DCCS']
+    DCCS_Config = DCCSOptions(apiUrl=api_link, credentialKey=cred_key)
+    edgeAgentOption.DCCS = DCCS_Config
+    edgeAgent = EdgeAgent(edgeAgentOption)
+    edgeAgent.connect()
 
+    # Update the SDK connection button's text
+    SDK_connection_button.config(text='Connected to SDK Database', state=tk.DISABLED)
+
+
+def send_data_SDK(agent,data1,data2):
+    data = categorization(data1,data2)
+    agent.sendData(data)
+def categorization(temperature, progress):
+    edgeData = EdgeData()
+
+    Temp_Device = "3D_Printer"
+
+    tag_Temp_name = "Temperature"
+    value_temp = temperature
+
+    tag_Progress_name = "Progression"
+    value_progress = progress
+
+    tag_Timer_name = "Print_Time"
+    value_timer = timer_value
+
+    tag_Temp = EdgeTag(Temp_Device, tag_Temp_name, value_temp)
+    tag_Timer = EdgeTag(Temp_Device,tag_Timer_name, value_timer)
+    tag_Progress = EdgeTag(Temp_Device, tag_Progress_name, value_progress)
+
+    edgeData.tagList.append(tag_Timer)
+    edgeData.tagList.append(tag_Progress)
+    edgeData.tagList.append(tag_Temp)
+
+    edgeData.timestamp = datetime.datetime.now()
+    return edgeData
+def generateConfig():
+    config = EdgeConfig()
+    nodeConfig = NodeConfig(nodeType=constant.EdgeType['Gateway'])
+    config.node = nodeConfig
+    deviceConfig = DeviceConfig(id='3D_Printer',
+                                name='3D_Printer',
+                                description='Device',
+                                deviceType='Smart Device',
+                                retentionPolicyName='')
+    analog1 = AnalogTagConfig(name='Temperature',
+                                             description='ATag ',
+                                             readOnly=False,
+                                             arraySize=0,
+                                             spanHigh=1000,
+                                             spanLow=0,
+                                             engineerUnit='',
+                                             integerDisplayFormat=4,
+                                             fractionDisplayFormat=2)
+    analog2 = AnalogTagConfig(name='Progression',
+                              description='ATag ',
+                              readOnly=False,
+                              arraySize=0,
+                              spanHigh=1000,
+                              spanLow=0,
+                              engineerUnit='',
+                              integerDisplayFormat=4,
+                              fractionDisplayFormat=2)
+    text = AnalogTagConfig(name='Print_Time',
+                              description='ATag ',
+                              readOnly=False,
+                              arraySize=0,
+                              spanHigh=1000,
+                              spanLow=0,
+                              engineerUnit='',
+                              integerDisplayFormat=4,
+                              fractionDisplayFormat=2)
+
+    deviceConfig.analogTagList.append(analog1)
+    deviceConfig.analogTagList.append(analog2)
+    deviceConfig.analogTagList.append(text)
+    config.node.deviceList.append(deviceConfig)
+    return config
+
+def upload_config(config, agent):
+    if agent is None:
+        tk.messagebox.showerror("Error", "Please connect to the SDK database before configuring JSON")
+        return
+    agent.uploadConfig(action=constant.ActionType['Create'], edgeConfig=config)
+# Add StringVar variables
+node_id = tk.StringVar()
+api_url = tk.StringVar()
+credential_key = tk.StringVar()
+
+api_frame = tk.Frame(root)
+api_frame.pack(pady=10)
+
+api_label1 = tk.Label(api_frame, text="NodeID:")
+api_label1.grid(row=0, column=0, sticky="e", padx=10, pady=10)
+api_label2 = tk.Label(api_frame, text="API URL:")
+api_label2.grid(row=1, column=0, sticky="e", padx=10, pady=10)
+api_label3 = tk.Label(api_frame, text="Credential Key:")
+api_label3.grid(row=2, column=0, sticky="e", padx=10, pady=10)
+
+api_entry1 = tk.Entry(api_frame, textvariable=node_id)
+api_entry1.grid(row=0, column=1, padx=10, pady=10)
+api_entry2 = tk.Entry(api_frame, textvariable=api_url)
+api_entry2.grid(row=1, column=1, padx=10, pady=10)
+api_entry3 = tk.Entry(api_frame, textvariable=credential_key)
+api_entry3.grid(row=2, column=1, padx=10, pady=10)
 
 host_label = tk.Label(connection_frame, text="Host:")
 host_label.pack(side=tk.LEFT)
@@ -134,6 +279,9 @@ connect_button.pack(side=tk.LEFT)
 input_frame = tk.Frame(root)
 input_frame.pack()
 
+
+
+
 # Create the input field for G-code commands
 command_entry = tk.Entry(input_frame, width=30)
 command_entry.pack(side=tk.LEFT)
@@ -141,6 +289,17 @@ command_entry.pack(side=tk.LEFT)
 # Create the send button
 send_button = tk.Button(input_frame, text="Send", command=send_command)
 send_button.pack(side=tk.LEFT)
+
+SDK_connection_button = tk.Button(input_frame, text="Connect SDK database",
+                                  command=lambda: SDK_connect(api_url.get(), node_id.get(), credential_key.get()))
+SDK_connection_button.pack(side=tk.RIGHT)
+
+
+send_SDK_button = tk.Button(input_frame, text="Send Data to DB", command=toggle_send_data)
+send_SDK_button.pack(side=tk.RIGHT)
+
+Create_config = tk.Button(input_frame, text="Configure JSON", command=lambda: upload_config(generateConfig(), edgeAgent))
+Create_config.pack(side=tk.RIGHT)
 
 # Create the add periodic send button
 add_periodic_send_button = tk.Button(input_frame, text="+", command=add_periodic_send)
