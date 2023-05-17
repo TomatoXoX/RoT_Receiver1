@@ -83,6 +83,31 @@ class DeviceGUI(tk.Frame):
         self.api_url = tk.StringVar()
         self.credential_key = tk.StringVar()
         self.ESPCAM = tk.StringVar()
+        cv2.namedWindow("Processed Image", cv2.WINDOW_NORMAL)
+
+        self.printing_progress = tk.DoubleVar()
+        self.printing_progress.set(0)
+        self.temp_display = tk.StringVar()
+        self.temp_display.set("Current Temp: -\nTarget Temp: -\nPID:-")
+
+        # Device Info
+        device_info = tk.LabelFrame(self, text="Device Information")
+        device_info.grid(row=0, column=0, padx=5, pady=5, sticky="we", columnspan=2)
+
+        self.temp_label = tk.Label(device_info, text="Temperature:")
+        self.temp_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+
+        self.temp_value_label = tk.Label(device_info, textvariable=self.temp_display)
+        self.temp_value_label.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+        self.progress_label = tk.Label(device_info, text="Printing Progress:")
+        self.progress_label.grid(row=1, column=0, padx=5, pady=5, sticky="w")
+
+        self.progress_bar = ttk.Progressbar(device_info, orient="horizontal", length=200, mode="determinate",
+                                            variable=self.printing_progress)
+        self.progress_bar.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
+
         # Connection Settings
         connection_settings = tk.LabelFrame(self, text="Connection Settings")
         connection_settings.grid(row=0, column=0, padx=5, pady=5, sticky="we", columnspan=2)
@@ -281,6 +306,7 @@ class DeviceGUI(tk.Frame):
                 current_byte, total_byte = map(int, progress_data.split('/'))
                 progress = self.get_pro_value(current_byte, total_byte)
                 self.update_progress_bar(progress)
+                self.printing_progress.set(self.ans)
             except Exception as e:
                 print("Error parsing progress:", e)
 
