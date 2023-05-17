@@ -1,0 +1,1 @@
+threading.Thread(target=self.getImage,daemon=True).start()
