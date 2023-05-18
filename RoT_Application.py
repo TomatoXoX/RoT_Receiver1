@@ -1,6 +1,5 @@
 import datetime
 import requests
-import cv2
 import numpy as np
 from roboflow import Roboflow
 from PIL import Image, ImageDraw, ImageFont, ImageTk
@@ -84,7 +83,6 @@ class DeviceGUI(tk.Frame):
         self.api_url = tk.StringVar()
         self.credential_key = tk.StringVar()
         self.ESPCAM = tk.StringVar()
-        cv2.namedWindow("Processed Image", cv2.WINDOW_NORMAL)
 
         self.printing_progress = tk.DoubleVar()
         self.printing_progress.set(0)
