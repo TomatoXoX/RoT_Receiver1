@@ -111,7 +111,7 @@ class DeviceGUI(tk.Frame):
 
         # Connection Settings
         connection_settings = tk.LabelFrame(self, text="Connection Settings")
-        connection_settings.grid(row=0, column=0, padx=5, pady=5, sticky="we", columnspan=2)
+        connection_settings.grid(row=3, column=0, padx=5, pady=5, sticky="we", columnspan=2)
 
         self.api_label1 = tk.Label(connection_settings, text="NodeID:")
         self.api_label1.grid(row=0, column=0, padx=5, pady=5, sticky="e")
@@ -135,20 +135,10 @@ class DeviceGUI(tk.Frame):
                                             command=lambda: self.SDK_connect(self.api_url.get(), self.node_id.get(),
                                                                              self.credential_key.get()))
         self.connect_sdk_button.grid(row=3, column=1, padx=5, pady=5)
-#  _____ ____  ____      _________     ____    _    __  __   _
- #| ____/ ___||  _ \    |___ /___ \   / ___|  / \  |  \/  | | |__   _____  __
- #|  _| \___ \| |_) |____ |_ \ __) | | |     / _ \ | |\/| | | '_ \ / _ \ \/ 6+/
- #| |___ ___) |  __/_____|__) / __/  | |___ / ___ \| |  | | | |_) | (_) >  <
- #|_____|____/|_|       |____/_____|  \____/_/   \_\_|  |_| |_.__/ \___/_/\_\
         self.ESPCam_label = tk.Entry(connection_settings,textvariable=self.ESPCAM)
         self.ESPCam_label.grid(row=3, column=2, padx=5, pady=5, sticky="e")
         self.ESPCam_Btn = tk.Button(connection_settings,text="Connect to ESP-CAM",command = self.buttonCallback)
         self.ESPCam_Btn.grid(row =3, column = 5,padx=5, pady=5, sticky="e")
-        
-        
-        
-        
-        
         # Log Display
         self.log_display = scrolledtext.ScrolledText(self, wrap=tk.WORD, width=50, height=20)
         self.log_display.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
