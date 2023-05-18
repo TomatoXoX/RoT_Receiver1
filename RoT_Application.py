@@ -73,25 +73,47 @@ class DeviceGUI(tk.Frame):
             #self.image_label = tk.Label(self)
             #self.image_label.grid(row=3, column=0, columnspan=2, padx=5, pady=5)
         # Create a new window for image display
-        self.image_window = tk.Toplevel(self)
-        self.image_label = tk.Label(self.image_window)
-        self.image_label.pack()   
+
          
     def init_gui(self):
         self.periodic_sends = []
         self.node_id = tk.StringVar()
         self.api_url = tk.StringVar()
+        self.print_time = tk.StringVar()
         self.credential_key = tk.StringVar()
         self.ESPCAM = tk.StringVar()
-
         self.printing_progress = tk.DoubleVar()
-        self.printing_progress.set(0)
         self.temp_display = tk.StringVar()
         self.temp_display.set("Current Temp: -\nTarget Temp: -\nPID:-")
 
+        # Set row and column weights
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
+
+        # Device Image
+        image_window = tk.LabelFrame(self, text="Device Image")
+        image_window.grid(row=0, column=2, padx=10, pady=10, sticky="nsew", columnspan=3)
+        image_window.columnconfigure(0, weight=1)
+        image_window.rowconfigure(0, weight=1)
+
+
+        self.image_label = tk.Label(image_window)
+        self.image_label.grid(row=0, column=0, padx=5, pady=5, sticky="nsew", columnspan=2)
+
         # Device Info
         device_info = tk.LabelFrame(self, text="Device Information")
-        device_info.grid(row=0, column=0, padx=5, pady=5, sticky="we", columnspan=2)
+        device_info.grid(row=0, column=0, padx=10, pady=10, sticky="nsew", columnspan=2)
+        device_info.columnconfigure(0, weight=1)
+        device_info.columnconfigure(1, weight=1)
+
+
+
+        self.print_time_label = tk.Label(device_info,text="Printing Time")
+        self.print_time_label.grid(row=2, column=0, padx=5, pady=5, sticky="w")
+
+        self.print_time_value = tk.Label(device_info, textvariable=self.print_time)
+        self.print_time_value.grid(row=2, column=1, padx=5, pady=5, sticky="w")
 
         self.temp_label = tk.Label(device_info, text="Temperature:")
         self.temp_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
@@ -106,10 +128,11 @@ class DeviceGUI(tk.Frame):
                                             variable=self.printing_progress)
         self.progress_bar.grid(row=1, column=1, padx=5, pady=5, sticky="w")
 
-
         # Connection Settings
         connection_settings = tk.LabelFrame(self, text="Connection Settings")
-        connection_settings.grid(row=3, column=0, padx=5, pady=5, sticky="we", columnspan=2)
+        connection_settings.grid(row=1, column=0, padx=10, pady=10, sticky="nsew", columnspan=2)
+        connection_settings.columnconfigure(0, weight=1)
+        connection_settings.columnconfigure(1, weight=1)
 
         self.api_label1 = tk.Label(connection_settings, text="NodeID:")
         self.api_label1.grid(row=0, column=0, padx=5, pady=5, sticky="e")
@@ -139,11 +162,13 @@ class DeviceGUI(tk.Frame):
         self.ESPCam_Btn.grid(row =3, column = 5,padx=5, pady=5, sticky="e")
         # Log Display
         self.log_display = scrolledtext.ScrolledText(self, wrap=tk.WORD, width=50, height=20)
-        self.log_display.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
+        self.log_display.grid(row=2, column=0, padx=10, pady=10, sticky="nsew", columnspan=2)
 
         # Command and Periodic Send
         command_section = tk.LabelFrame(self, text="Command and Periodic Send")
-        command_section.grid(row=2, column=0, padx=5, pady=5, sticky="we", columnspan=2)
+        command_section.grid(row=3, column=0, padx=10, pady=10, sticky="nsew", columnspan=2)
+        command_section.columnconfigure(0, weight=4)
+        command_section.columnconfigure(1, weight=1)
 
         self.command_entry = ttk.Entry(command_section)
         self.command_entry.grid(row=0, column=0, padx=5, pady=5, sticky="we")
@@ -156,7 +181,8 @@ class DeviceGUI(tk.Frame):
 
         # Other Actions
         other_actions = tk.LabelFrame(self, text="Other Actions")
-        other_actions.grid(row=0, column=2, padx=5, pady=5, sticky="we", rowspan=2)
+        other_actions.grid(row=0, column=3, padx=10, pady=10, sticky="ew", rowspan=3)
+        other_actions.columnconfigure(0, weight=1)
 
         self.create_config = tk.Button(other_actions, text="Configure JSON",
                                        command=lambda: self.upload_config(self.generateConfig(), self.edgeAgent))
@@ -169,7 +195,7 @@ class DeviceGUI(tk.Frame):
         
         
         
-        
+
     def buttonCallback(self):
         try:
             rf = Roboflow(api_key="Sb6J3slpbLnQuWDH67DW")
@@ -188,7 +214,6 @@ class DeviceGUI(tk.Frame):
         while True:
            try: 
             self.process_image(self.ESPCAM.get())
-            
            except Exception as e:
                print(e) 
            time.sleep(1)     
@@ -256,9 +281,7 @@ class DeviceGUI(tk.Frame):
         self.image_label.configure(image=photo)
         self.image_label.image = photo
 
-        # Bring the image window to the front
-        self.image_window.lift()
-        self.image_window.attributes('-topmost', True)
+
             
     def connect(self):
         try:
@@ -271,9 +294,9 @@ class DeviceGUI(tk.Frame):
     # Add the rest of the methods from your original code as instance methods of the DeviceGUI class
     def get_temp_value(self, value):
         self.value_for_temp = value
-    def get_pro_value(self, value1, value2):
-        self.ans = (value1 / value2) * 100
-        return self.ans
+
+    def update_temperature(self, current_temp, target_temp, pid_number):
+        self.temp_display.set(f"Current Temp: {current_temp:.2f}°C\nTarget Temp: {target_temp:.2f}°C\nPID: {pid_number}")
     def toggle_send_data(self):
         self.sending_data = not self.sending_data
         if self.sending_data:
@@ -293,12 +316,11 @@ class DeviceGUI(tk.Frame):
             try:
                 progress_data = log_data.split("SD printing byte")[1].strip()
                 current_byte, total_byte = map(int, progress_data.split('/'))
-                progress = self.get_pro_value(current_byte, total_byte)
+                progress = current_byte/total_byte
+                self.ans = progress
                 self.update_progress_bar(progress)
-                self.printing_progress.set(self.ans)
             except Exception as e:
                 print("Error parsing progress:", e)
-
         if "ok T:" in log_data:
             try:
                 temp_data = log_data.split("ok T:")[1].strip()
@@ -306,6 +328,7 @@ class DeviceGUI(tk.Frame):
                 current_temp = float(current_temp)
                 target_temp = float(target_temp.split('/')[1])
                 pid_number = int(pid_number.split('@:')[1])
+                self.update_temperature(current_temp, target_temp, pid_number)
                 self.get_temp_value(current_temp)
             except Exception as e:
                 print("Error parsing temperature:", e)
@@ -313,6 +336,7 @@ class DeviceGUI(tk.Frame):
             try:
                 print_time = log_data.split("echo:Print time:")[1].strip()
                 self.timer_value = print_time
+                self.print_time.set(print_time)
             except Exception as e:
                 print("Error parsing run time:", e)
         # Rest of the process_log method
@@ -418,9 +442,10 @@ class DeviceGUI(tk.Frame):
         return self.edgeData
     def update_progress_bar(self, progress):
         # Implement the method to update the progress bar
-        progress = (current_byte / total_byte) * 100
-        self.progress_var.set(progress)
+        self.printing_progress.set(progress)
         self.progress_label.config(text=f"Progress: {progress:.2f}%")
+        self.progress_bar.update(progress)
+
         pass
 
     def SDK_connect(self,api_link, NodeID, cred_key):
@@ -443,7 +468,7 @@ class MainApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Multi-Device Manager")
-        self.geometry("700x900")
+        self.geometry("1028x900")
 
         self.add_device_frame = tk.Frame(self)
         self.add_device_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=10)
