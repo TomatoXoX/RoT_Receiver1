@@ -1,16 +1,18 @@
 import datetime
-import requests
+
 import numpy as np
 from roboflow import Roboflow
 from PIL import Image, ImageDraw, ImageFont, ImageTk
 from io import BytesIO
 import socket
 import time
+import requests
 import tkinter as tk
 from tkinter import scrolledtext, ttk
 import threading
 from tkinter import messagebox
 from wisepaasdatahubedgesdk.EdgeAgent import EdgeAgent
+
 import wisepaasdatahubedgesdk.Common.Constants as constant
 from wisepaasdatahubedgesdk.Model.Edge import EdgeAgentOptions, MQTTOptions, DCCSOptions, EdgeData, EdgeTag, EdgeStatus, \
     EdgeDeviceStatus, EdgeConfig, NodeConfig, DeviceConfig, AnalogTagConfig, DiscreteTagConfig, TextTagConfig
@@ -24,6 +26,7 @@ class PeriodicSend:
         self.device = device
         self.periodic_command_entry = tk.Entry(self.frame, width=30)
         self.periodic_command_entry.pack(side=tk.LEFT)
+
 
         self.interval_entry = tk.Entry(self.frame, width=5)
         self.interval_entry.pack(side=tk.LEFT)
@@ -64,6 +67,7 @@ class DeviceGUI(tk.Frame):
         self.ans = 0
         self.init_gui()
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.config_track = "None"
         # AI    
         self.AI_link = "None"
         self.model  = 0
@@ -85,29 +89,49 @@ class DeviceGUI(tk.Frame):
         self.printing_progress = tk.DoubleVar()
         self.temp_display = tk.StringVar()
         self.temp_display.set("Current Temp: -\nTarget Temp: -\nPID:-")
+        self.coordinate = [0,0,0,0]
+        self.Fault_detect = False
+        self.Fault_Confidence = 0
 
         # Set row and column weights
         self.grid_rowconfigure(0, weight=1)
+
         self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure(3, weight=1)
 
         # Device Image
         image_window = tk.LabelFrame(self, text="Device Image")
         image_window.grid(row=0, column=2, padx=10, pady=10, sticky="nsew", columnspan=3)
         image_window.columnconfigure(0, weight=1)
         image_window.rowconfigure(0, weight=1)
-
-
         self.image_label = tk.Label(image_window)
-        self.image_label.grid(row=0, column=0, padx=5, pady=5, sticky="nsew", columnspan=2)
+        self.image_label.grid(row=0, column=0, padx=5, pady=5, sticky="nsew", columnspan=2,rowspan=3)
 
+        # Device configuration
+        device_config = tk.LabelFrame(self,text="Configure Device")
+        device_config.grid(row=2,column=2,padx=5, pady=5, sticky="nsew", columnspan=2)
+        device_config.columnconfigure(0,weight=1)
+        device_config.columnconfigure(1,weight=1)
+        self.Device_name=tk.StringVar()
+        self.Device_ID =tk.StringVar()
+        self.Device_descript = tk.StringVar()
+        self.Device_name_label = tk.Label(device_config,text="Device Name")
+        self.Device_name_label.grid(row=0,column=0,padx=5, pady=5, sticky="w")
+        self.device_name_value = tk.Entry(device_config,textvariable=self.Device_name)
+        self.device_name_value.grid(row=0,column=1,padx=5, pady=5, sticky="w")
+        self.Device_desc_label = tk.Label(device_config,text="Device Description")
+        self.Device_desc_label.grid(row=1,column=0,padx=5, pady=5, sticky="w")
+        self.Device_desc_value = tk.Entry(device_config,textvariable=self.Device_descript)
+        self.Device_desc_value.grid(row = 1,column=1,padx=5, pady=5, sticky="w")
+        self.Device_ID_label = tk.Label(device_config, text="Device ID")
+        self.Device_ID_label.grid(row=2, column=0, padx=5, pady=5, sticky="w")
+        self.Device_ID_value = tk.Entry(device_config, textvariable=self.Device_ID)
+        self.Device_ID_value.grid(row=2, column=1, padx=5, pady=5, sticky="w")
         # Device Info
         device_info = tk.LabelFrame(self, text="Device Information")
         device_info.grid(row=0, column=0, padx=10, pady=10, sticky="nsew", columnspan=2)
         device_info.columnconfigure(0, weight=1)
         device_info.columnconfigure(1, weight=1)
-
-
 
         self.print_time_label = tk.Label(device_info,text="Printing Time")
         self.print_time_label.grid(row=2, column=0, padx=5, pady=5, sticky="w")
@@ -181,26 +205,24 @@ class DeviceGUI(tk.Frame):
 
         # Other Actions
         other_actions = tk.LabelFrame(self, text="Other Actions")
-        other_actions.grid(row=0, column=3, padx=10, pady=10, sticky="ew", rowspan=3)
+        other_actions.grid(row=3, column=2, padx=10, pady=10, sticky="ew", rowspan=3)
         other_actions.columnconfigure(0, weight=1)
 
         self.create_config = tk.Button(other_actions, text="Configure JSON",
-                                       command=lambda: self.upload_config(self.generateConfig(), self.edgeAgent))
+                                       command=lambda: self.upload_config(self.generateConfig(self.Device_name.get(),self.Device_descript.get(),self.Device_ID.get()), self.edgeAgent))
         self.create_config.grid(row=0, column=0, padx=5, pady=5)
 
+        self.update_con = tk.Button(other_actions,text="Update JSON",command=lambda: self.update_config(self.generateConfig(self.Device_name.get(),self.Device_descript.get(),self.Device_ID.get()),self.edgeAgent))
+        self.update_con.grid(row=1,column=0,padx=5, pady=5)
         self.send_SDK_button = ttk.Button(other_actions, text="Send Data to DB", command=self.toggle_send_data)
-        self.send_SDK_button.grid(row=1, column=0, padx=5, pady=5)
-
+        self.send_SDK_button.grid(row=2, column=0, padx=5, pady=5)
         self.pack(expand=True, fill=tk.BOTH)
-        
-        
-        
 
     def buttonCallback(self):
         try:
-            rf = Roboflow(api_key="Sb6J3slpbLnQuWDH67DW")
-            project = rf.workspace().project("3d-printing-flaws")
-            self.model = project.version(8).model
+            rf = Roboflow(api_key="GIV3u0jdRC9OYmwV4pSC")
+            project = rf.workspace().project("3d-printing-defects")
+            self.model = project.version(3).model
             print(self.ESPCAM.get())
             # Global variable to store the processed image
             self.processed_image = None         # Usage = ?, delete soon
@@ -226,10 +248,11 @@ class DeviceGUI(tk.Frame):
             self.img_np = np.array(image)
 
             # Resize the image to a constant size (480x480)
-            image = image.resize((480, 480))
+            image = image.resize((800,800))
 
-            predictions = self.model.predict(self.img_np, confidence=40, overlap=30).json()
-            print(predictions)
+            predictions = self.model.predict(self.img_np, confidence=30, overlap=30).json()
+            self.Fault_detect = self.has_prediction(predictions)
+
 
             # Process the predictions and draw bounding boxes on the image
             draw = ImageDraw.Draw(image)
@@ -240,6 +263,10 @@ class DeviceGUI(tk.Frame):
                 h = int(prediction['height'])
                 class_label = prediction['class']
                 confidence = prediction['confidence']
+                if self.Fault_detect:
+                    self.Fault_Confidence = confidence
+                else:
+                    self.Fault_Confidence = 0
 
                 # Calculate the coordinates of the top-left and bottom-right corners
                 x1 = cx - w // 2
@@ -270,9 +297,8 @@ class DeviceGUI(tk.Frame):
                 draw.text(label_position, label_text, font=label_font, fill=label_color)
 
             # Show the processed image
-            self.display_image(image)
 
-            
+            self.display_image(image)
     def display_image(self, image):
         # Convert the image to PhotoImage format
         photo = ImageTk.PhotoImage(image)
@@ -281,11 +307,14 @@ class DeviceGUI(tk.Frame):
         self.image_label.configure(image=photo)
         self.image_label.image = photo
 
-
-            
+    def has_prediction(self, predictions):
+        if len(predictions['predictions']) > 0:
+            print(self.Fault_Confidence)
+            return True
+        else:
+            return False
     def connect(self):
         try:
-
             self.s.connect((self.host, self.port))
             threading.Thread(target=self.recv_log_messages, daemon=True).start()
             self.connect_button.config(text="Connected", state=tk.DISABLED)
@@ -307,16 +336,26 @@ class DeviceGUI(tk.Frame):
     def send_data_loop(self):
         if self.sending_data:
             self.send_data_SDK(self.edgeAgent, self.value_for_temp, self.ans)
-            print(f"temp={self.value_for_temp}")
             self.after(1000, self.send_data_loop)  # Adjust the time interval as needed
     def process_log(self, log_data):
         self.log_display.insert(tk.END, log_data + '\n')
         self.log_display.see(tk.END)
+        if "X:" in log_data:
+            try:
+                cord = log_data.split(" ")
+                self.coordinate[0] = float(cord[0].split(":")[1])
+                self.coordinate[1] = float(cord[1].split(":")[1])
+                self.coordinate[2] = float(cord[2].split(":")[1])
+                self.coordinate[3] = float(cord[3].split(":")[1])
+
+            except Exception as e:
+                print(f"Error parsing Coordinate:{e}")
+
         if "SD printing byte" in log_data:
             try:
                 progress_data = log_data.split("SD printing byte")[1].strip()
                 current_byte, total_byte = map(int, progress_data.split('/'))
-                progress = current_byte/total_byte
+                progress = (current_byte/total_byte)*100
                 self.ans = progress
                 self.update_progress_bar(progress)
             except Exception as e:
@@ -359,27 +398,27 @@ class DeviceGUI(tk.Frame):
         self.edgeAgent = EdgeAgent(self.edgeAgentOption)
         self.edgeAgent.connect()
         # Update the SDK connection button's text
-        self.SDK_connection_button.config(text='Connected to SDK Database', state=tk.DISABLED)
+        self.connect_sdk_button.config(text='Connected to SDK Database', state=tk.DISABLED)
     def send_command(self):
         command = self.command_entry.get()
         cmd = command + "\n"
         self.s.send(cmd.encode('utf-8'))
         self.command_entry.delete(0, tk.END)
     def send_data_SDK(self, edge_agent, temperature, progress):
-        self.data = self.categorization(temperature, progress)
-        edge_agent.sendData(self.data)
+        data = self.categorization(temperature, progress)
+        edge_agent.sendData(data)
         pass
-    def generateConfig(self):
+    def generateConfig(self,name,descript,ID):
         config = EdgeConfig()
         nodeConfig = NodeConfig(nodeType=constant.EdgeType['Gateway'])
         config.node = nodeConfig
-        deviceConfig = DeviceConfig(id='3D_Printer',
-                                    name='3D_Printer',
-                                    description='Device',
+        deviceConfig = DeviceConfig(id=ID,
+                                    name=name,
+                                    description=descript,
                                     deviceType='Smart Device',
                                     retentionPolicyName='')
         analog1 = AnalogTagConfig(name='Temperature',
-                                  description='ATag ',
+                                  description='Temperature monitoring of Printer head',
                                   readOnly=False,
                                   arraySize=0,
                                   spanHigh=1000,
@@ -388,7 +427,7 @@ class DeviceGUI(tk.Frame):
                                   integerDisplayFormat=4,
                                   fractionDisplayFormat=2)
         analog2 = AnalogTagConfig(name='Progression',
-                                  description='ATag ',
+                                  description='Product print progress',
                                   readOnly=False,
                                   arraySize=0,
                                   spanHigh=1000,
@@ -397,7 +436,7 @@ class DeviceGUI(tk.Frame):
                                   integerDisplayFormat=4,
                                   fractionDisplayFormat=2)
         text = AnalogTagConfig(name='Print_Time',
-                               description='ATag ',
+                               description='Product run time',
                                readOnly=False,
                                arraySize=0,
                                spanHigh=1000,
@@ -405,10 +444,70 @@ class DeviceGUI(tk.Frame):
                                engineerUnit='',
                                integerDisplayFormat=4,
                                fractionDisplayFormat=2)
+        coord1 = AnalogTagConfig(name='X',
+                               description='X coordinate',
+                               readOnly=False,
+                               arraySize=0,
+                               spanHigh=1000,
+                               spanLow=0,
+                               engineerUnit='',
+                               integerDisplayFormat=4,
+                               fractionDisplayFormat=2)
+        coord2 = AnalogTagConfig(name='Y',
+                                 description='Y coordinate',
+                                 readOnly=False,
+                                 arraySize=0,
+                                 spanHigh=1000,
+                                 spanLow=0,
+                                 engineerUnit='',
+                                 integerDisplayFormat=4,
+                                 fractionDisplayFormat=2)
+        coord3 = AnalogTagConfig(name='Z',
+                                 description='Layer Height',
+                                 readOnly=False,
+                                 arraySize=0,
+                                 spanHigh=1000,
+                                 spanLow=0,
+                                 engineerUnit='',
+                                 integerDisplayFormat=4,
+                                 fractionDisplayFormat=2)
+        extruder = AnalogTagConfig(name='E',
+                                 description='Filament spent in (mm)',
+                                 readOnly=False,
+                                 arraySize=0,
+                                 spanHigh=1000,
+                                 spanLow=0,
+                                 engineerUnit='',
+                                 integerDisplayFormat=4,
+                                 fractionDisplayFormat=2)
+        Fault1 = AnalogTagConfig(name='Fault',
+                                   description='AI Detected Fault',
+                                   readOnly=False,
+                                   arraySize=0,
+                                   spanHigh=1000,
+                                   spanLow=0,
+                                   engineerUnit='',
+                                   integerDisplayFormat=4,
+                                   fractionDisplayFormat=2)
+        Fault2 = AnalogTagConfig(name='Falt_Confidence',
+                                   description='Detection Confidence',
+                                   readOnly=False,
+                                   arraySize=0,
+                                   spanHigh=1000,
+                                   spanLow=0,
+                                   engineerUnit='',
+                                   integerDisplayFormat=4,
+                                   fractionDisplayFormat=2)
 
         deviceConfig.analogTagList.append(analog1)
         deviceConfig.analogTagList.append(analog2)
         deviceConfig.analogTagList.append(text)
+        deviceConfig.analogTagList.append(coord1)
+        deviceConfig.analogTagList.append(coord2)
+        deviceConfig.analogTagList.append(coord3)
+        deviceConfig.analogTagList.append(extruder)
+        deviceConfig.analogTagList.append(Fault1)
+        deviceConfig.analogTagList.append(Fault2)
         config.node.deviceList.append(deviceConfig)
         return config
     def upload_config(self,config, agent):
@@ -416,10 +515,15 @@ class DeviceGUI(tk.Frame):
             tk.messagebox.showerror("Error", "Please connect to the SDK database before configuring JSON")
             return
         agent.uploadConfig(action=constant.ActionType['Create'], edgeConfig=config)
+    def update_config(self,config, agent):
+        if agent is None:
+            tk.messagebox.showerror("Error", "Please connect to the SDK database before configuring JSON")
+            return
+        agent.uploadConfig(action=constant.ActionType['Update'], edgeConfig=config)
     def categorization(self,temperature, progress):
         self.edgeData = EdgeData()
 
-        Temp_Device = "3D_Printer"
+        Temp_Device = self.Device_ID.get()
 
         tag_Temp_name = "Temperature"
         self.value_temp = temperature
@@ -430,13 +534,37 @@ class DeviceGUI(tk.Frame):
         tag_Timer_name = "Print_Time"
         self.value_timer = self.timer_value
 
+        tag_Coordinate_X = "X"
+        tag_Coordinate_Y = "Y"
+        tag_Coordinate_Z = "Z"
+        tag_Coordinate_E = "E"
+        tag_Fault = "Fault"
+        tag_Confidence = "Falt_Confidence"
+        if self.Fault_detect:
+            temp_var = "True"
+        else:
+            temp_var = "False"
+
+        tag_X = EdgeTag(Temp_Device,tag_Coordinate_X,self.coordinate[0])
+        tag_Y = EdgeTag(Temp_Device, tag_Coordinate_Y, self.coordinate[1])
+        tag_Z = EdgeTag(Temp_Device, tag_Coordinate_Z, self.coordinate[2])
+        tag_E = EdgeTag(Temp_Device, tag_Coordinate_E, self.coordinate[3])
         tag_Temp = EdgeTag(Temp_Device, tag_Temp_name, self.value_temp)
         tag_Timer = EdgeTag(Temp_Device, tag_Timer_name, self.value_timer)
         tag_Progress = EdgeTag(Temp_Device, tag_Progress_name, self.value_progress)
+        tag_F = EdgeTag(Temp_Device, tag_Fault, temp_var)
+        tag_C = EdgeTag(Temp_Device, tag_Confidence, self.Fault_Confidence)
 
         self.edgeData.tagList.append(tag_Timer)
         self.edgeData.tagList.append(tag_Progress)
         self.edgeData.tagList.append(tag_Temp)
+        self.edgeData.tagList.append(tag_X)
+        self.edgeData.tagList.append(tag_Y)
+        self.edgeData.tagList.append(tag_Z)
+        self.edgeData.tagList.append(tag_E)
+        self.edgeData.tagList.append(tag_F)
+        self.edgeData.tagList.append(tag_C)
+        print(temp_var)
 
         self.edgeData.timestamp = datetime.datetime.now()
         return self.edgeData
@@ -447,14 +575,6 @@ class DeviceGUI(tk.Frame):
         self.progress_bar.update(progress)
 
         pass
-
-    def SDK_connect(self,api_link, NodeID, cred_key):
-        self.edgeAgentOption = EdgeAgentOptions(nodeId=NodeID)
-        self.edgeAgentOption.connectType = constant.ConnectType['DCCS']
-        self.DCCS_Config = DCCSOptions(apiUrl=api_link, credentialKey=cred_key)
-        self.edgeAgentOption.DCCS = self.DCCS_Config
-        self.edgeAgent = EdgeAgent(self.edgeAgentOption)
-        self.edgeAgent.connect()
 
     def add_periodic_send(self):
         periodic_send_frame = tk.Frame(self)
