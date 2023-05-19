@@ -101,7 +101,7 @@ class DeviceGUI(tk.Frame):
 
         # Device Image
         image_window = tk.LabelFrame(self, text="Device Image")
-        image_window.grid(row=0, column=2, padx=10, pady=10, sticky="nsew", columnspan=3)
+        image_window.grid(row=2, column=2, padx=10, pady=10, sticky="nsew", columnspan=3)
         image_window.columnconfigure(0, weight=1)
         image_window.rowconfigure(0, weight=1)
         self.image_label = tk.Label(image_window)
@@ -109,7 +109,7 @@ class DeviceGUI(tk.Frame):
 
         # Device configuration
         device_config = tk.LabelFrame(self,text="Configure Device")
-        device_config.grid(row=2,column=2,padx=5, pady=5, sticky="nsew", columnspan=2)
+        device_config.grid(row=0,column=2,padx=5, pady=5, sticky="nsew", columnspan=2)
         device_config.columnconfigure(0,weight=1)
         device_config.columnconfigure(1,weight=1)
         self.Device_name=tk.StringVar()
@@ -185,7 +185,7 @@ class DeviceGUI(tk.Frame):
         self.ESPCam_Btn = tk.Button(connection_settings,text="Connect to ESP-CAM",command = self.buttonCallback)
         self.ESPCam_Btn.grid(row =3, column = 5,padx=5, pady=5, sticky="e")
         # Log Display
-        self.log_display = scrolledtext.ScrolledText(self, wrap=tk.WORD, width=50, height=20)
+        self.log_display = scrolledtext.ScrolledText(self, wrap=tk.WORD, width=10, height=10)
         self.log_display.grid(row=2, column=0, padx=10, pady=10, sticky="nsew", columnspan=2)
 
         # Command and Periodic Send
@@ -216,7 +216,36 @@ class DeviceGUI(tk.Frame):
         self.update_con.grid(row=1,column=0,padx=5, pady=5)
         self.send_SDK_button = ttk.Button(other_actions, text="Send Data to DB", command=self.toggle_send_data)
         self.send_SDK_button.grid(row=2, column=0, padx=5, pady=5)
+
+        self.save = tk.Button(other_actions,text="Save Config",command=lambda: self.Save_current_entry())
+        self.save.grid(row=0,column=1)
+
+        self.fill = tk.Button(other_actions,text="Import Config",command=lambda: self.Fill_entry())
+        self.fill.grid(row=1,column=1)
+
         self.pack(expand=True, fill=tk.BOTH)
+
+    def Save_current_entry(self):
+        with open("My_config.txt","w") as f:
+            f.write("api_entry1@"+self.node_id.get()+"\n")
+            f.write("api_entry2@" + self.api_url.get() + "\n")
+            f.write("api_entry3@" + self.credential_key.get() + "\n")
+            f.write("Device_ID_value@" + self.Device_ID.get() + "\n")
+            f.write("device_name_value@" + self.Device_name.get() + "\n")
+            f.write("Device_desc_value@" + self.Device_descript.get() + "\n")
+            f.write("ESPCam_label@"+self.ESPCam_label.get()+"\n")
+    def Fill_entry(self):
+        with open("My_config.txt","r") as f:
+            for line in f:
+                parts = line.strip().split("@")
+                var_name= parts[0]
+                var_value = parts[1]
+                att = getattr(self,var_name)
+                setattr(self,var_name,var_value)
+                att.insert(0,var_value)
+
+
+
 
     def buttonCallback(self):
         try:
@@ -248,7 +277,7 @@ class DeviceGUI(tk.Frame):
             self.img_np = np.array(image)
 
             # Resize the image to a constant size (480x480)
-            image = image.resize((800,800))
+            image = image.resize((800,600))
 
             predictions = self.model.predict(self.img_np, confidence=30, overlap=30).json()
             self.Fault_detect = self.has_prediction(predictions)
@@ -263,10 +292,8 @@ class DeviceGUI(tk.Frame):
                 h = int(prediction['height'])
                 class_label = prediction['class']
                 confidence = prediction['confidence']
-                if self.Fault_detect:
-                    self.Fault_Confidence = confidence
-                else:
-                    self.Fault_Confidence = 0
+                self.Fault_Confidence = confidence
+                
 
                 # Calculate the coordinates of the top-left and bottom-right corners
                 x1 = cx - w // 2
@@ -297,7 +324,7 @@ class DeviceGUI(tk.Frame):
                 draw.text(label_position, label_text, font=label_font, fill=label_color)
 
             # Show the processed image
-
+            image = image.resize((200,150))
             self.display_image(image)
     def display_image(self, image):
         # Convert the image to PhotoImage format
@@ -542,8 +569,10 @@ class DeviceGUI(tk.Frame):
         tag_Confidence = "Falt_Confidence"
         if self.Fault_detect:
             temp_var = "True"
+            confidence = self.Fault_Confidence
         else:
             temp_var = "False"
+            confidence = 0
 
         tag_X = EdgeTag(Temp_Device,tag_Coordinate_X,self.coordinate[0])
         tag_Y = EdgeTag(Temp_Device, tag_Coordinate_Y, self.coordinate[1])
@@ -553,7 +582,7 @@ class DeviceGUI(tk.Frame):
         tag_Timer = EdgeTag(Temp_Device, tag_Timer_name, self.value_timer)
         tag_Progress = EdgeTag(Temp_Device, tag_Progress_name, self.value_progress)
         tag_F = EdgeTag(Temp_Device, tag_Fault, temp_var)
-        tag_C = EdgeTag(Temp_Device, tag_Confidence, self.Fault_Confidence)
+        tag_C = EdgeTag(Temp_Device, tag_Confidence, confidence)
 
         self.edgeData.tagList.append(tag_Timer)
         self.edgeData.tagList.append(tag_Progress)
@@ -577,8 +606,8 @@ class DeviceGUI(tk.Frame):
         pass
 
     def add_periodic_send(self):
-        periodic_send_frame = tk.Frame(self)
-        periodic_send_frame.grid(row=len(self.periodic_sends) + 6, column=0, columnspan=2, padx=5, pady=5, sticky="we")
+        periodic_send_frame = tk.LabelFrame(self,text="Periodic Send")
+        periodic_send_frame.grid(row=4+len(self.periodic_sends), column=0, columnspan=1, padx=5, pady=5)
         periodic_send = PeriodicSend(periodic_send_frame,self.s)
         self.periodic_sends.append(periodic_send)
 
@@ -608,6 +637,7 @@ class MainApp(tk.Tk):
 
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(expand=True, fill=tk.BOTH)
+
 
     def add_new_device(self):
         ip = self.ip_entry.get()
