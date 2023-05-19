@@ -1,0 +1,7 @@
+api_entry1@8a8841a4-36af-4818-b138-2d0e6537c1d9
+api_entry2@https://api-dccs-ensaas.education.wise-paas.com/
+api_entry3@6f1b849f98a2d4d6db286d747d6f8ban
+Device_ID_value@Printer1
+device_name_value@RoT_Printer_1
+Device_desc_value@Smart Printer
+ESPCam_label@http://192.168.1.3/snap
