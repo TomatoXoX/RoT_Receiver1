@@ -75,8 +75,8 @@ class DeviceGUI(tk.Frame):
         # Create a new window for image display
         self.image_window = tk.Toplevel(self)
         self.image_label = tk.Label(self.image_window)
-        self.image_label.pack()   
-         
+        self.image_label.pack()  
+        self.error_window = None;       # For image proessing errors 
     def init_gui(self):
         self.periodic_sends = []
         self.node_id = tk.StringVar()
@@ -133,20 +133,16 @@ class DeviceGUI(tk.Frame):
                                             command=lambda: self.SDK_connect(self.api_url.get(), self.node_id.get(),
                                                                              self.credential_key.get()))
         self.connect_sdk_button.grid(row=3, column=1, padx=5, pady=5)
-#  _____ ____  ____      _________     ____    _    __  __   _
- #| ____/ ___||  _ \    |___ /___ \   / ___|  / \  |  \/  | | |__   _____  __
- #|  _| \___ \| |_) |____ |_ \ __) | | |     / _ \ | |\/| | | '_ \ / _ \ \/ 6+/
- #| |___ ___) |  __/_____|__) / __/  | |___ / ___ \| |  | | | |_) | (_) >  <
- #|_____|____/|_|       |____/_____|  \____/_/   \_\_|  |_| |_.__/ \___/_/\_\
+    # _____ ____  ____      _________     ____    _    __  __   _
+    #| ____/ ___||  _ \    |___ /___ \   / ___|  / \  |  \/  | | |__   _____  __
+    #|  _| \___ \| |_) |____ |_ \ __) | | |     / _ \ | |\/| | | '_ \ / _ \ \/ 6+/
+    #| |___ ___) |  __/_____|__) / __/  | |___ / ___ \| |  | | | |_) | (_) >  <
+    #|_____|____/|_|       |____/_____|  \____/_/   \_\_|  |_| |_.__/ \___/_/\_\
         self.ESPCam_label = tk.Entry(connection_settings,textvariable=self.ESPCAM)
         self.ESPCam_label.grid(row=3, column=2, padx=5, pady=5, sticky="e")
         self.ESPCam_Btn = tk.Button(connection_settings,text="Connect to ESP-CAM",command = self.buttonCallback)
         self.ESPCam_Btn.grid(row =3, column = 5,padx=5, pady=5, sticky="e")
-        
-        
-        
-        
-        
+             
         # Log Display
         self.log_display = scrolledtext.ScrolledText(self, wrap=tk.WORD, width=50, height=20)
         self.log_display.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
@@ -177,9 +173,8 @@ class DeviceGUI(tk.Frame):
 
         self.pack(expand=True, fill=tk.BOTH)
         
-        
-        
-        
+    
+    # Connect button            
     def buttonCallback(self):
         try:
             rf = Roboflow(api_key="Sb6J3slpbLnQuWDH67DW")
@@ -195,13 +190,18 @@ class DeviceGUI(tk.Frame):
             print(e)         
     # Get images from ESP-32CAM
     def getImage(self):
-        while True:
-           try: 
-            self.process_image(self.ESPCAM.get())
-            
-           except Exception as e:
-               print(e) 
-           time.sleep(1)     
+            while True:
+                try: 
+                    self.process_image(self.ESPCAM.get())
+                except requests.exceptions.RequestException as e:
+                    # Inaccessible URL
+                    error_message = "Error retrieving image:\n" + str(e)
+                    self.show_error_window(error_message)
+                except Exception as e:
+                    # Handle any other exception that might occur during image processing
+                    error_message = "Error processing image:\n" + str(e)
+                    self.show_error_window(error_message)
+                time.sleep(1)   
     # Process images from ESP-32CAM
     def process_image(self, image_url):
         # Retrieve the image from the URL
@@ -256,8 +256,7 @@ class DeviceGUI(tk.Frame):
 
             # Show the processed image
             self.display_image(image)
-
-            
+    # Display robflow-processed image          
     def display_image(self, image):
         # Convert the image to PhotoImage format
         photo = ImageTk.PhotoImage(image)
@@ -269,7 +268,23 @@ class DeviceGUI(tk.Frame):
         # Bring the image window to the front
         self.image_window.lift()
         self.image_window.attributes('-topmost', True)
-            
+    # Error Window
+    def show_error_window(self, message):
+        if self.error_window is not None and self.error_window.winfo_exists():
+            # If the error window already exists, destroy it before creating a new one
+            self.error_window.destroy()
+
+        self.error_window = tk.Toplevel(self)
+        self.error_window.title("Error")
+        self.error_window.geometry("300x100")
+        error_label = tk.Label(self.error_window, text=message, wraplength=250)
+        error_label.pack(padx=20, pady=20)
+        ok_button = tk.Button(self.error_window, text="OK", command=self.error_window.destroy)
+        ok_button.pack(pady=10)
+        
+        
+       
+                
     def connect(self):
         try:
 
